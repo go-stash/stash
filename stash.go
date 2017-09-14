@@ -16,7 +16,7 @@ var (
 	// ErrCreateFile represents the error encountered when can't create file.
 	ErrCreateFile = errors.New("can't create file")
 
-	// ErrCreateFile represents the error encountered when can't write file.
+	// ErrWriteFile represents the error encountered when can't write file.
 	ErrWriteFile = errors.New("can't write file")
 )
 

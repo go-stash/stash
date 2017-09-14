@@ -2,10 +2,10 @@ package stash
 
 import (
 	"container/list"
-	"os"
 	"strings"
-	"bufio"
 	"io"
+	"os"
+	"errors"
 )
 
 // New creates an Cache of the given Directory, StorageSize & TotalFilesToBeWritten
@@ -40,25 +40,16 @@ func (c *Cache) Add(key string, val []byte) error {
 	//@TODO check available space
 	//@TODO check available file count
 
-	content := string(val)
-	fileName := getFileName(key)
-	f, e := os.Create(c.Dir + string(os.PathSeparator) + fileName)
-	defer f.Close()
-	if e != nil {
-		return ErrCreateFile
-	}
-	w := bufio.NewWriter(f)
-	if _, e := w.WriteString(content); e != nil {
-		return ErrCreateFile
-	}
-	if e := w.Flush(); e != nil {
+	if path, l, e := writeToFile(key, c.Dir, val); e != nil {
 		return e
+	} else {
+		c.onAdd(key, path, l)
+		return nil
 	}
-	return nil
 }
 
 // AddFrom adds the contents of a reader as a blob to the cache against the given key.
-func (c *Cache) AddFrom(key string, r *io.Reader) error {
+func (c *Cache) AddFrom(key string, r io.Reader) error {
 	c.Lock.Lock()
 	defer c.Lock.Unlock()
 
@@ -68,18 +59,48 @@ func (c *Cache) AddFrom(key string, r *io.Reader) error {
 	//@TODO check available space
 	//@TODO check available file count
 
-	fileName := getFileName(key)
-	f, e := os.Create(c.Dir + string(os.PathSeparator) + fileName)
-	defer f.Close()
-	if e != nil {
-		return ErrCreateFile
-	}
-	w := bufio.NewWriter(f)
-	if _, e := w.ReadFrom(r); e != nil {
-		return ErrCreateFile
-	}
-	if e := w.Flush(); e != nil {
+	if path, l, e := writeToFile(key, c.Dir, r); e != nil {
 		return e
+	} else {
+		c.onAdd(key, path, l)
+		return nil
 	}
-	return nil
+}
+
+// Update the cache.
+func (c *Cache) onAdd(key, path string, length int64) {
+	c.StorageSizeUsed += length
+	c.TotalFilesWritten += 1
+	if item, ok := c.Items[key]; ok {
+		c.ItemsList.MoveToFront(item)
+		item.Value.(*ItemMeta) = &ItemMeta {
+			Size: length,
+			Path: path,
+		}
+	} else {
+		item := &ItemMeta {
+			Size: length,
+			Path: path,
+		}
+		listElement := c.ItemsList.PushFront(item)
+		c.Items[key] = listElement
+	}
+}
+
+// Get returns a reader for a blob in the cache, or ErrNotFound otherwise.
+func (c *Cache) Get(key string) (io.ReadCloser, error) {
+	c.Lock.RLock()
+	defer c.Lock.RUnlock()
+
+	if item, ok := c.Items[key]; ok {
+		c.ItemsList.MoveToFront(item)
+		path := item.Value.(*ItemMeta).Path
+		if f, err := os.Open(path); err != nil {
+			return nil, err
+		} else {
+			return f, nil
+		}
+	} else {
+		return nil, ErrNotFound
+	}
 }
