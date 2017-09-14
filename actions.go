@@ -5,7 +5,6 @@ import (
 	"strings"
 	"io"
 	"os"
-	"errors"
 )
 
 // New creates an Cache of the given Directory, StorageSize & TotalFilesToBeWritten
@@ -73,12 +72,12 @@ func (c *Cache) onAdd(key, path string, length int64) {
 	c.TotalFilesWritten += 1
 	if item, ok := c.Items[key]; ok {
 		c.ItemsList.MoveToFront(item)
-		item.Value.(*ItemMeta) = &ItemMeta {
-			Size: length,
-			Path: path,
-		}
+		item.Value.(*ItemMeta).Key = key
+		item.Value.(*ItemMeta).Size = length
+		item.Value.(*ItemMeta).Path = path
 	} else {
 		item := &ItemMeta {
+			Key: key,
 			Size: length,
 			Path: path,
 		}
@@ -103,4 +102,15 @@ func (c *Cache) Get(key string) (io.ReadCloser, error) {
 	} else {
 		return nil, ErrNotFound
 	}
+}
+
+// Keys returns a list of keys in the cache.
+func (c *Cache) Keys() []string {
+	keys := make([]string, len(c.Items))
+	i := 0
+	for item := c.ItemsList.Back(); item != nil; item = item.Prev() {
+		keys[i] = item.Value.(*ItemMeta).Key
+		i++
+	}
+	return keys
 }

@@ -21,6 +21,7 @@ var (
 )
 
 type ItemMeta struct {
+	Key string //key of blob
 	Size int64 //Size of blob
 	Path string //Path of blob
 }
