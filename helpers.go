@@ -25,7 +25,7 @@ func writeToFile(dir, key string, container interface{}) (path string, length in
 	}
 	w := bufio.NewWriter(f)
 	switch contentGetter := container.(type) {
-	case byte:
+	case []byte:
 		var lInt int
 		lInt, error = w.WriteString(string(contentGetter))
 		if error != nil {
