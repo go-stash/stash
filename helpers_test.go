@@ -44,10 +44,6 @@ func deleteCacheDir(dir string) {
 	checkError(os.RemoveAll(dir))
 }
 
-func deleteFile(path string) {
-	checkError(os.Remove(path))
-}
-
 func getFile() (io.Reader, string) {
 	dir := getCacheDir("stash_cache_file_write_test")
 	path := dir + string(os.PathSeparator) + getFileName(key)
@@ -62,25 +58,7 @@ func getFile() (io.Reader, string) {
 	return f, dir
 }
 
-func TestWriteToFileContentString(t *testing.T)  {
-	dir := getCacheDir("stash_cache")
-	defer deleteCacheDir(dir)
-
-	path, length, err := writeToFile(dir, key, []byte(key))
-	defer deleteFile(path)
-	if err != nil {
-		t.Fatalf("Can't write to file in path %s %#v", dir, err)
-	}
-	pathNameShouldBe := dir + string(os.PathSeparator) + getFileName(key)
-	if path != pathNameShouldBe {
-		t.Fatalf("Path Name not equal (%s!=%s)", path, pathNameShouldBe)
-	}
-	if length != 1 {
-		t.Fatalf("Number of bytes is %d should be 1 ", length)
-	}
-}
-
-func TestWriteToFileContentFileReader(t *testing.T)  {
+func TestWriteToFileContent(t *testing.T)  {
 	dir := getCacheDir("stash_cache")
 	defer deleteCacheDir(dir)
 

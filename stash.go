@@ -18,6 +18,15 @@ var (
 
 	// ErrWriteFile represents the error encountered when can't write file.
 	ErrWriteFile = errors.New("can't write file")
+
+	// ErrInavlidSize represents the error encountered when sz is less or equal to zero.
+	ErrInavlidSize = errors.New("storage size must be greater then zero")
+
+	// ErrInavlidCap represents the error encountered when c is less or equal to zero.
+	ErrInavlidCap = errors.New("file number must be greater then zero")
+
+	// ErrFileSizeExceedsStorageSize represents the error encountered when file size more then storage size.
+	ErrFileSizeExceedsStorageSize = errors.New("file number must be less or equal storage size")
 )
 
 type ItemMeta struct {

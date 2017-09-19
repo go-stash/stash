@@ -6,7 +6,6 @@ import (
 	"os"
 	"bufio"
 	"io"
-	"errors"
 )
 
 func getFileName(key string) string {
@@ -14,7 +13,7 @@ func getFileName(key string) string {
 }
 
 //write container content to file
-func writeToFile(dir, key string, container interface{}) (path string, length int64, error error)  {
+func writeToFile(dir, key string, container io.Reader) (path string, length int64, error error)  {
 	fileName := getFileName(key)
 	path = dir + string(os.PathSeparator) + fileName
 	f, e := os.Create(path)
@@ -24,21 +23,9 @@ func writeToFile(dir, key string, container interface{}) (path string, length in
 		return
 	}
 	w := bufio.NewWriter(f)
-	switch contentGetter := container.(type) {
-	case []byte:
-		var lInt int
-		lInt, error = w.WriteString(string(contentGetter))
-		if error != nil {
-			return path, length, ErrWriteFile
-		}
-		length = int64(lInt)
-	case io.Reader:
-		length, error = w.ReadFrom(contentGetter)
-		if error != nil {
-			return path, length, ErrWriteFile
-		}
-	default:
-		return path, length, errors.New("invalid type")
+	length, error = w.ReadFrom(container)
+	if error != nil {
+		return path, length, ErrWriteFile
 	}
 	error = w.Flush()
 	if error != nil {

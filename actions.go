@@ -5,6 +5,7 @@ import (
 	"strings"
 	"io"
 	"os"
+	"bytes"
 )
 
 // New creates an Cache of the given Directory, StorageSize & TotalFilesToBeWritten
@@ -13,10 +14,14 @@ func New(dir string, sz, c int64) (*Cache, error) {
 	if dir == "" {
 		return nil, ErrEmptyDir
 	}
-
-	//@TODO check Directory readable & writable
-	//@TODO check StorageSize greater then zero
-	//@TODO check TotalFilesToBeWritten greater then zero
+	//check StorageSize greater then zero
+	if sz <= 0 {
+		return nil, ErrInavlidSize
+	}
+	//check TotalFilesToBeWritten greater then zero
+	if c <= 0 {
+		return nil, ErrInavlidCap
+	}
 
 	dir = strings.TrimRight(dir, "\\/") //trim the right directory separator
 	return &Cache{
@@ -32,19 +37,7 @@ func New(dir string, sz, c int64) (*Cache, error) {
 func (c *Cache) Add(key string, val []byte) error {
 	c.Lock.Lock()
 	defer c.Lock.Unlock()
-
-	//@TODO check key
-	//@TODO check val
-
-	//@TODO check available space
-	//@TODO check available file count
-
-	if path, l, e := writeToFile(key, c.Dir, val); e != nil {
-		return e
-	} else {
-		c.onAdd(key, path, l)
-		return nil
-	}
+	return c.AddFrom(key, bytes.NewReader(val))
 }
 
 // AddFrom adds the contents of a reader as a blob to the cache against the given key.
@@ -52,38 +45,71 @@ func (c *Cache) AddFrom(key string, r io.Reader) error {
 	c.Lock.Lock()
 	defer c.Lock.Unlock()
 
-	//@TODO check key
-	//@TODO check r
-
-	//@TODO check available space
-	//@TODO check available file count
-
 	if path, l, e := writeToFile(key, c.Dir, r); e != nil {
 		return e
 	} else {
+		if e := c.validate(path, l); e != nil {
+			return e
+		}
 		c.onAdd(key, path, l)
 		return nil
 	}
 }
 
+// Validate the file.
+func (c *Cache) validate(path string, length int64) error {
+	if length > c.StorageSize {
+		return ErrFileSizeExceedsStorageSize
+	}
+	if length + c.StorageSizeUsed <= c.StorageSize && c.TotalFilesWritten + 1 <= c.TotalFilesToBeWritten {
+		return nil
+	} else if length + c.StorageSizeUsed >= c.StorageSize {
+		if e := c.removeLast(); e != nil {
+			return e
+		}
+		c.validate(path, length)
+	} else if c.TotalFilesWritten + 1 >= c.TotalFilesToBeWritten {
+		if e := c.removeLast(); e != nil {
+			return e
+		}
+		c.validate(path, length)
+	}
+	return nil
+}
+
+// Removes the last file.
+func (c *Cache) removeLast() error {
+	if last := c.ItemsList.Back(); last != nil {
+		item := last.Value.(*ItemMeta)
+		if e := os.Remove(item.Path); e == nil {
+			c.StorageSizeUsed -= item.Size
+			c.TotalFilesWritten --
+			delete(c.Items, item.Key)
+			c.ItemsList.Remove(last)
+			return nil
+		} else {
+			return e
+		}
+	}
+
+	return nil
+}
+
 // Update the cache.
 func (c *Cache) onAdd(key, path string, length int64) {
 	c.StorageSizeUsed += length
-	c.TotalFilesWritten += 1
+	c.TotalFilesWritten ++
 	if item, ok := c.Items[key]; ok {
-		c.ItemsList.MoveToFront(item)
-		item.Value.(*ItemMeta).Key = key
-		item.Value.(*ItemMeta).Size = length
-		item.Value.(*ItemMeta).Path = path
-	} else {
-		item := &ItemMeta {
-			Key: key,
-			Size: length,
-			Path: path,
-		}
-		listElement := c.ItemsList.PushFront(item)
-		c.Items[key] = listElement
+		c.ItemsList.Remove(item)
 	}
+
+	item := &ItemMeta {
+		Key: key,
+		Size: length,
+		Path: path,
+	}
+	listElement := c.ItemsList.PushFront(item)
+	c.Items[key] = listElement
 }
 
 // Get returns a reader for a blob in the cache, or ErrNotFound otherwise.
