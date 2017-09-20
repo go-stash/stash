@@ -35,8 +35,6 @@ func New(dir string, sz, c int64) (*Cache, error) {
 
 // Add adds a byte slice as a blob to the cache against the given key.
 func (c *Cache) Add(key string, val []byte) error {
-	c.Lock.Lock()
-	defer c.Lock.Unlock()
 	return c.AddFrom(key, bytes.NewReader(val))
 }
 
@@ -45,7 +43,7 @@ func (c *Cache) AddFrom(key string, r io.Reader) error {
 	c.Lock.Lock()
 	defer c.Lock.Unlock()
 
-	if path, l, e := writeToFile(key, c.Dir, r); e != nil {
+	if path, l, e := writeToFile(c.Dir, key, r); e != nil {
 		return e
 	} else {
 		if e := c.validate(path, l); e != nil {
@@ -59,7 +57,11 @@ func (c *Cache) AddFrom(key string, r io.Reader) error {
 // Validate the file.
 func (c *Cache) validate(path string, length int64) error {
 	if length > c.StorageSize {
-		return ErrFileSizeExceedsStorageSize
+		if e := os.Remove(path); e == nil {
+			return ErrFileSizeExceedsStorageSize
+		} else {
+			return e
+		}
 	}
 	if length + c.StorageSizeUsed <= c.StorageSize && c.TotalFilesWritten + 1 <= c.TotalFilesToBeWritten {
 		return nil

@@ -1,9 +1,9 @@
 package stash
 
 import (
-	"testing"
+	/*"testing"
 	"fmt"
-	"crypto/md5"
+	"crypto/md5"*/
 	"io/ioutil"
 	"log"
 	"os"
@@ -15,14 +15,14 @@ var (
 	key string = "a"
 )
 
-func TestGetFileName(t *testing.T)  {
+/*func TestGetFileName(t *testing.T)  {
 	fileName := fmt.Sprintf("%x", md5.Sum([]byte(key)))
 	returnFileName := getFileName(key)
 
 	if fileName != returnFileName {
 		t.Fatalf("FileName not equal (%s!=%s)", fileName, returnFileName)
 	}
-}
+}*/
 
 func getCacheDir(prefix string) string {
 	dir, err := ioutil.TempDir("", prefix)
@@ -58,7 +58,8 @@ func getFile() (io.Reader, string) {
 	return f, dir
 }
 
-func TestWriteToFileContent(t *testing.T)  {
+/*
+func TestWriteToFile(t *testing.T)  {
 	dir := getCacheDir("stash_cache")
 	defer deleteCacheDir(dir)
 
@@ -75,4 +76,4 @@ func TestWriteToFileContent(t *testing.T)  {
 	if length != 1 {
 		t.Fatalf("Number of bytes is %d should be 1 ", length)
 	}
-}
+}*/

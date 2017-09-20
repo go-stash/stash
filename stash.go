@@ -26,7 +26,7 @@ var (
 	ErrInavlidCap = errors.New("file number must be greater then zero")
 
 	// ErrFileSizeExceedsStorageSize represents the error encountered when file size more then storage size.
-	ErrFileSizeExceedsStorageSize = errors.New("file number must be less or equal storage size")
+	ErrFileSizeExceedsStorageSize = errors.New("file size must be less or equal storage size")
 )
 
 type ItemMeta struct {
