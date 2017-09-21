@@ -1,7 +1,7 @@
 before_script:
     - mkdir -p $GOPATH/src/gopkg.in
     - ln -s $CI_PROJECT_DIR $GOPATH/src/gopkg.in/stash
-    - cd $GOPATH/gopkg.in/stash
+    - cd $GOPATH/src/gopkg.in/stash
 
 stages:
     - test
