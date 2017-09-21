@@ -1,0 +1,22 @@
+before_script:
+    - mkdir -p $GOPATH/src/gopkg.in
+    - ln -s $CI_PROJECT_DIR $GOPATH/src/gopkg.in/stash
+    - cd $GOPATH/gopkg.in/stasha
+
+stages:
+    - test
+    - build
+
+test-go-1.5:
+    image: golang:1.9
+    stage: test
+    script:
+        - go get -v -t
+        - go test -v
+
+build-go-1.5:
+    image: golang:1.9
+    stage: build
+    script:
+        - go get -v
+        - go build -v
