@@ -4,17 +4,17 @@ before_script:
     - cd $GOPATH/src/gopkg.in/stash
 
 stages:
-    - test
     - build
+    - test
 
-test-go-1.5:
+test-go-1.9:
     image: golang:1.9
     stage: test
     script:
         - go get -v -t
         - go test -v
 
-build-go-1.5:
+build-go-1.9:
     image: golang:1.9
     stage: build
     script:
