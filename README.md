@@ -14,6 +14,8 @@ The only dependency is the Go distribution.
 
 ## Motivation
 
+This package allows us to reduce calls to our blob storage by caching the most recently used blobs to disk.
+
 ## Documentation
 
 - [Reference](https://godoc.org/gopkg.in/stash.v1)
