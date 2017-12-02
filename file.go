@@ -10,7 +10,7 @@ import (
 // writeFile writes a new file to the cache storage.
 func writeFile(dir, key string, r io.Reader) (string, int64, error) {
 	name := shasum(key)
-	path := dir + string(os.PathSeparator) + name
+	path := filepath(dir, name)
 
 	f, err := os.Create(path)
 	defer f.Close()
@@ -23,6 +23,10 @@ func writeFile(dir, key string, r io.Reader) (string, int64, error) {
 	}
 
 	return path, n, nil
+}
+
+func filepath(dir, name string) string {
+	return dir + string(os.PathSeparator) + name
 }
 
 func shasum(v string) string {
