@@ -30,4 +30,4 @@ Stash is available under the [BSD (3-Clause) License](https://opensource.org/lic
 
 The package is a work in progress. It is functional, but does not claim to be production-ready. Please use it at your own risk.
 
-_The icon is made by [Smashicons](https://www.flaticon.com/authors/smashicons) from [www.flaticon.com](https://www.flaticon.com/) is licensed by [CC 3.0 BY](http://creativecommons.org/licenses/by/3.0/)._
+_The icon, made by [Smashicons](https://www.flaticon.com/authors/smashicons) from [www.flaticon.com](https://www.flaticon.com/), is licensed by [CC 3.0 BY](http://creativecommons.org/licenses/by/3.0/)._
