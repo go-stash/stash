@@ -34,19 +34,19 @@ func TestNew(t *testing.T) {
 			dir: "",
 			sz:  2048,
 			c:   4,
-			err: ErrInvalidDir,
+			err: ErrBadDir,
 		},
 		{
 			dir: storageDir,
 			sz:  0,
 			c:   0,
-			err: ErrInavlidSize,
+			err: ErrBadSize,
 		},
 		{
 			dir: storageDir,
 			sz:  2048,
 			c:   0,
-			err: ErrInavlidCap,
+			err: ErrBadCap,
 		},
 	} {
 		clearStorage()

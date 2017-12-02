@@ -33,15 +33,15 @@ type Cache struct {
 func New(dir string, sz, c int64) (*Cache, error) {
 	//check dir value empty
 	if dir == "" {
-		return nil, ErrInvalidDir
+		return nil, ErrBadDir
 	}
 	//check StorageSize greater then zero
 	if sz <= 0 {
-		return nil, ErrInavlidSize
+		return nil, ErrBadSize
 	}
 	//check TotalFilesToBeWritten greater then zero
 	if c <= 0 {
-		return nil, ErrInavlidCap
+		return nil, ErrBadCap
 	}
 
 	dir = strings.TrimRight(dir, "\\/") //trim the right directory separator
@@ -67,7 +67,7 @@ func (c *Cache) AddFrom(key string, r io.Reader) error {
 	if path, l, e := writeFile(c.Dir, key, r); e != nil {
 		return e
 	} else {
-		if e := c.validate(path, l); e != nil {
+		if e := c.validate(path, l); e != nil { // XXX(hjr265): We should validate before storing the file.
 			return e
 		}
 		c.onAdd(key, path, l)
@@ -79,7 +79,7 @@ func (c *Cache) AddFrom(key string, r io.Reader) error {
 func (c *Cache) validate(path string, length int64) error {
 	if length > c.StorageSize {
 		if e := os.Remove(path); e == nil {
-			return ErrFileSizeExceedsStorageSize
+			return &FileError{c.Dir, "", ErrTooLarge}
 		} else {
 			return e
 		}

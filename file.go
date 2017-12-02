@@ -15,11 +15,11 @@ func writeFile(dir, key string, r io.Reader) (string, int64, error) {
 	f, err := os.Create(path)
 	defer f.Close()
 	if err != nil {
-		return "", 0, ErrCreateFile
+		return "", 0, &FileError{dir, key, err}
 	}
 	n, err := io.Copy(f, r)
 	if err != nil {
-		return "", 0, ErrWriteFile
+		return "", 0, &FileError{dir, key, err}
 	}
 
 	return path, n, nil
