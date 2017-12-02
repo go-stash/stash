@@ -2,7 +2,7 @@
 
 A Go package for disk-based blob cache.
 
-![](https://github.com/altercation/solarized/raw/master/folder.png)
+![](https://github.com/go-stash/stash/raw/master/folder.png)
 
 ## Installation
 
