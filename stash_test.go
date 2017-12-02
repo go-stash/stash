@@ -85,9 +85,9 @@ func TestSizeEviction(t *testing.T) {
 	s, err := New(storageDir, 10, 40)
 	catch(err)
 
-	err = s.Put("a", []byte("abcdefg"))
+	err = s.Put("a", []byte("abcdefgh"))
 	catch(err)
-	err = s.Put("b", []byte("hi"))
+	err = s.Put("b", []byte("ij"))
 	catch(err)
 	assertKeys(t, s.Keys(), []string{"a", "b"})
 
@@ -103,9 +103,38 @@ func TestSizeEviction(t *testing.T) {
 	catch(err)
 	assertKeys(t, s.Keys(), []string{"b", "c", "d", "e"})
 
-	err = s.Put("f", []byte("nopqrstuv"))
+	err = s.Put("f", []byte("nopqrstuvw"))
 	catch(err)
 	assertKeys(t, s.Keys(), []string{"f"})
+}
+
+func TestCapEviction(t *testing.T) {
+	clearStorage()
+
+	s, err := New(storageDir, 2048, 3)
+	catch(err)
+
+	err = s.Put("a", []byte("abcdefg"))
+	catch(err)
+	err = s.Put("b", []byte("hi"))
+	catch(err)
+	assertKeys(t, s.Keys(), []string{"a", "b"})
+
+	err = s.Put("c", []byte("k"))
+	catch(err)
+	assertKeys(t, s.Keys(), []string{"a", "b", "c"})
+
+	err = s.Put("d", []byte("l"))
+	catch(err)
+	assertKeys(t, s.Keys(), []string{"b", "c", "d"})
+
+	err = s.Put("e", []byte("m"))
+	catch(err)
+	assertKeys(t, s.Keys(), []string{"c", "d", "e"})
+
+	err = s.Put("f", []byte("nopqrstuv"))
+	catch(err)
+	assertKeys(t, s.Keys(), []string{"d", "e", "f"})
 }
 
 func TestMain(m *testing.M) {
@@ -122,7 +151,7 @@ func TestMain(m *testing.M) {
 
 func assertKeys(t *testing.T, keys []string, expected []string) {
 	if len(keys) != len(expected) {
-		t.Fatalf("Expected %d keys, got %d", len(expected), len(keys))
+		t.Fatalf("Expected %d key(s), got %d", len(expected), len(keys))
 	}
 	if !reflect.DeepEqual(keys, expected) {
 		t.Fatalf("Expected keys == %q, got %q", expected, keys)

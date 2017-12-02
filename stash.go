@@ -111,14 +111,14 @@ func (c *Cache) validate(path string, n int64) error {
 		return &FileError{c.dir, "", ErrTooLarge}
 	}
 
-	for n+c.sizeUsed >= c.size {
+	for n+c.sizeUsed > c.size {
 		err := c.evictLast()
 		if err != nil {
 			return err
 		}
 	}
 
-	if c.capUsed+1 >= c.cap {
+	if c.capUsed+1 > c.cap {
 		err := c.evictLast()
 		if err != nil {
 			return err
