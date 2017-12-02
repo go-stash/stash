@@ -5,143 +5,82 @@ import (
 	"container/list"
 	"io"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 )
 
 type Meta struct {
-	Key  string //key of blob
-	Size int64  //Size of blob
-	Path string //Path of blob
+	Key  string
+	Size int64
+	Path string
 }
 
 type Cache struct {
-	Dir                   string //Directory Path where files will be saved
-	StorageSize           int64  //Total Storage Size for file to write
-	TotalFilesToBeWritten int64  //Total Number of files to be written
+	dir  string // Path to storage directory
+	size int64  // Total size of files allowed
+	cap  int64  // Total number of files allowed
 
-	StorageSizeUsed   int64 //Total Storage used
-	TotalFilesWritten int64 //Total Files currently written
+	sizeUsed int64 // Total size of files added
+	capUsed  int64 // Total number of files added
 
-	ItemsList *list.List               //ItemsList will hold the list of entries
-	Items     map[string]*list.Element //Items/Files saved in storage
+	list *list.List               // List of items in cache
+	m    map[string]*list.Element // Map of items in list
 
-	Lock sync.RWMutex //Read Write sync
+	l sync.RWMutex
 }
 
-// New creates an Cache of the given Directory, StorageSize & TotalFilesToBeWritten
+// New creates a Cache backed by dir on disk. The cache allows at most c files of total size sz.
 func New(dir string, sz, c int64) (*Cache, error) {
-	//check dir value empty
-	if dir == "" {
+	if !validDir(dir) {
 		return nil, ErrBadDir
 	}
-	//check StorageSize greater then zero
 	if sz <= 0 {
 		return nil, ErrBadSize
 	}
-	//check TotalFilesToBeWritten greater then zero
 	if c <= 0 {
 		return nil, ErrBadCap
 	}
 
-	dir = strings.TrimRight(dir, "\\/") //trim the right directory separator
+	dir = strings.TrimRight(dir, string(os.PathSeparator)) // Clean path to dir
+
 	return &Cache{
-		Dir:                   dir,
-		StorageSize:           sz,
-		TotalFilesToBeWritten: c,
-		ItemsList:             list.New(),
-		Items:                 make(map[string]*list.Element),
+		dir:  dir,
+		size: sz,
+		cap:  c,
+		list: list.New(),
+		m:    make(map[string]*list.Element),
 	}, nil
 }
 
-// Add adds a byte slice as a blob to the cache against the given key.
-func (c *Cache) Add(key string, val []byte) error {
-	return c.AddFrom(key, bytes.NewReader(val))
+// Put adds a byte slice as a blob to the cache against the given key.
+func (c *Cache) Put(key string, val []byte) error {
+	return c.PutReader(key, bytes.NewReader(val))
 }
 
-// AddFrom adds the contents of a reader as a blob to the cache against the given key.
-func (c *Cache) AddFrom(key string, r io.Reader) error {
-	c.Lock.Lock()
-	defer c.Lock.Unlock()
+// PutReader adds the contents of a reader as a blob to the cache against the given key.
+func (c *Cache) PutReader(key string, r io.Reader) error {
+	c.l.Lock()
+	defer c.l.Unlock()
 
-	if path, l, e := writeFile(c.Dir, key, r); e != nil {
-		return e
-	} else {
-		if e := c.validate(path, l); e != nil { // XXX(hjr265): We should validate before storing the file.
-			return e
-		}
-		c.onAdd(key, path, l)
-		return nil
+	path, n, err := writeFile(c.dir, key, r)
+	if err != nil {
+		return err
 	}
-}
-
-// Validate the file.
-func (c *Cache) validate(path string, length int64) error {
-	if length > c.StorageSize {
-		if e := os.Remove(path); e == nil {
-			return &FileError{c.Dir, "", ErrTooLarge}
-		} else {
-			return e
-		}
+	if err := c.validate(path, n); err != nil { // XXX(hjr265): We should validate before storing the file.
+		return err
 	}
-	if length+c.StorageSizeUsed <= c.StorageSize && c.TotalFilesWritten+1 <= c.TotalFilesToBeWritten {
-		return nil
-	} else if length+c.StorageSizeUsed >= c.StorageSize {
-		if e := c.removeLast(); e != nil {
-			return e
-		}
-		c.validate(path, length)
-	} else if c.TotalFilesWritten+1 >= c.TotalFilesToBeWritten {
-		if e := c.removeLast(); e != nil {
-			return e
-		}
-		c.validate(path, length)
-	}
+	c.addMeta(key, path, n)
 	return nil
-}
-
-// Removes the last file.
-func (c *Cache) removeLast() error {
-	if last := c.ItemsList.Back(); last != nil {
-		item := last.Value.(*Meta)
-		if e := os.Remove(item.Path); e == nil {
-			c.StorageSizeUsed -= item.Size
-			c.TotalFilesWritten--
-			delete(c.Items, item.Key)
-			c.ItemsList.Remove(last)
-			return nil
-		} else {
-			return e
-		}
-	}
-
-	return nil
-}
-
-// Update the cache.
-func (c *Cache) onAdd(key, path string, length int64) {
-	c.StorageSizeUsed += length
-	c.TotalFilesWritten++
-	if item, ok := c.Items[key]; ok {
-		c.ItemsList.Remove(item)
-	}
-
-	item := &Meta{
-		Key:  key,
-		Size: length,
-		Path: path,
-	}
-	listElement := c.ItemsList.PushFront(item)
-	c.Items[key] = listElement
 }
 
 // Get returns a reader for a blob in the cache, or ErrNotFound otherwise.
 func (c *Cache) Get(key string) (io.ReadCloser, error) {
-	c.Lock.RLock()
-	defer c.Lock.RUnlock()
+	c.l.RLock()
+	defer c.l.RUnlock()
 
-	if item, ok := c.Items[key]; ok {
-		c.ItemsList.MoveToFront(item)
+	if item, ok := c.m[key]; ok {
+		c.list.MoveToFront(item)
 		path := item.Value.(*Meta).Path
 		if f, err := os.Open(path); err != nil {
 			return nil, err
@@ -155,11 +94,77 @@ func (c *Cache) Get(key string) (io.ReadCloser, error) {
 
 // Keys returns a list of keys in the cache.
 func (c *Cache) Keys() []string {
-	keys := make([]string, len(c.Items))
+	keys := make([]string, len(c.m))
 	i := 0
-	for item := c.ItemsList.Back(); item != nil; item = item.Prev() {
+	for item := c.list.Back(); item != nil; item = item.Prev() {
 		keys[i] = item.Value.(*Meta).Key
 		i++
 	}
+	sort.Strings(keys)
 	return keys
+}
+
+// validate ensures the file satisfies the constraints of the cache.
+func (c *Cache) validate(path string, n int64) error {
+	if n > c.size {
+		os.Remove(path) // XXX(hjr265): We should not supress this error even if it is very unlikely.
+		return &FileError{c.dir, "", ErrTooLarge}
+	}
+
+	for n+c.sizeUsed >= c.size {
+		err := c.evictLast()
+		if err != nil {
+			return err
+		}
+	}
+
+	if c.capUsed+1 >= c.cap {
+		err := c.evictLast()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// evitLast removes the last file following the LRU policy.
+func (c *Cache) evictLast() error {
+	if last := c.list.Back(); last != nil {
+		item := last.Value.(*Meta)
+		if e := os.Remove(item.Path); e == nil {
+			c.sizeUsed -= item.Size
+			c.capUsed--
+			delete(c.m, item.Key)
+			c.list.Remove(last)
+			return nil
+		} else {
+			return e
+		}
+	}
+
+	return nil
+}
+
+// addMeta adds meta information to the cache.
+func (c *Cache) addMeta(key, path string, length int64) {
+	c.sizeUsed += length
+	c.capUsed++
+	if item, ok := c.m[key]; ok {
+		c.list.Remove(item)
+	}
+
+	item := &Meta{
+		Key:  key,
+		Size: length,
+		Path: path,
+	}
+	listElement := c.list.PushFront(item)
+	c.m[key] = listElement
+}
+
+func validDir(dir string) bool {
+	// XXX(hjr265): We need to ensure the disk is either empty, or contains a valid cache storage.
+
+	return dir != ""
 }

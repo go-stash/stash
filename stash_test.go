@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"reflect"
 	"testing"
 )
 
@@ -58,12 +59,13 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func TestCacheAdd(t *testing.T) {
+func TestCachePut(t *testing.T) {
 	clearStorage()
 
-	s, _ := New(storageDir, 2048000, 40)
+	s, err := New(storageDir, 2048000, 40)
+	catch(err)
 	for k, b := range blobs {
-		err := s.Add(k, b)
+		err := s.Put(k, b)
 		catch(err)
 	}
 
@@ -77,6 +79,35 @@ func TestCacheAdd(t *testing.T) {
 	}
 }
 
+func TestSizeEviction(t *testing.T) {
+	clearStorage()
+
+	s, err := New(storageDir, 10, 40)
+	catch(err)
+
+	err = s.Put("a", []byte("abcdefg"))
+	catch(err)
+	err = s.Put("b", []byte("hi"))
+	catch(err)
+	assertKeys(t, s.Keys(), []string{"a", "b"})
+
+	err = s.Put("c", []byte("k"))
+	catch(err)
+	assertKeys(t, s.Keys(), []string{"b", "c"})
+
+	err = s.Put("d", []byte("l"))
+	catch(err)
+	assertKeys(t, s.Keys(), []string{"b", "c", "d"})
+
+	err = s.Put("e", []byte("m"))
+	catch(err)
+	assertKeys(t, s.Keys(), []string{"b", "c", "d", "e"})
+
+	err = s.Put("f", []byte("nopqrstuv"))
+	catch(err)
+	assertKeys(t, s.Keys(), []string{"f"})
+}
+
 func TestMain(m *testing.M) {
 	// Create a temporary storage directory for tests
 	name, err := ioutil.TempDir("", "stash-")
@@ -87,6 +118,15 @@ func TestMain(m *testing.M) {
 	defer os.RemoveAll(name)
 
 	os.Exit(m.Run())
+}
+
+func assertKeys(t *testing.T, keys []string, expected []string) {
+	if len(keys) != len(expected) {
+		t.Fatalf("Expected %d keys, got %d", len(expected), len(keys))
+	}
+	if !reflect.DeepEqual(keys, expected) {
+		t.Fatalf("Expected keys == %q, got %q", expected, keys)
+	}
 }
 
 func catch(err error) {
