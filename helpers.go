@@ -1,35 +1,30 @@
 package stash
 
 import (
+	"crypto/sha256"
 	"fmt"
-	"crypto/md5"
-	"os"
-	"bufio"
 	"io"
+	"os"
 )
 
-func getFileName(key string) string {
-	return fmt.Sprintf("%x", md5.Sum([]byte(key)))
+// writeFile writes a new file to the cache storage.
+func writeFile(dir, key string, r io.Reader) (string, int64, error) {
+	name := shasum(key)
+	path := dir + string(os.PathSeparator) + name
+
+	f, err := os.Create(path)
+	defer f.Close()
+	if err != nil {
+		return "", 0, ErrCreateFile
+	}
+	n, err := io.Copy(f, r)
+	if err != nil {
+		return "", 0, ErrWriteFile
+	}
+
+	return path, n, nil
 }
 
-//write container content to file
-func writeToFile(dir, key string, container io.Reader) (path string, length int64, error error)  {
-	fileName := getFileName(key)
-	path = dir + string(os.PathSeparator) + fileName
-	f, e := os.Create(path)
-	defer f.Close()
-	if e != nil {
-		error = ErrCreateFile
-		return
-	}
-	w := bufio.NewWriter(f)
-	length, error = w.ReadFrom(container)
-	if error != nil {
-		return path, length, ErrWriteFile
-	}
-	error = w.Flush()
-	if error != nil {
-		return
-	}
-	return
+func shasum(v string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(v)))
 }

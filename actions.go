@@ -1,11 +1,11 @@
 package stash
 
 import (
+	"bytes"
 	"container/list"
-	"strings"
 	"io"
 	"os"
-	"bytes"
+	"strings"
 )
 
 // New creates an Cache of the given Directory, StorageSize & TotalFilesToBeWritten
@@ -25,11 +25,11 @@ func New(dir string, sz, c int64) (*Cache, error) {
 
 	dir = strings.TrimRight(dir, "\\/") //trim the right directory separator
 	return &Cache{
-		Dir: dir,
-		StorageSize: sz,
+		Dir:                   dir,
+		StorageSize:           sz,
 		TotalFilesToBeWritten: c,
-		ItemsList: list.New(),
-		Items: make(map[string]*list.Element),
+		ItemsList:             list.New(),
+		Items:                 make(map[string]*list.Element),
 	}, nil
 }
 
@@ -43,7 +43,7 @@ func (c *Cache) AddFrom(key string, r io.Reader) error {
 	c.Lock.Lock()
 	defer c.Lock.Unlock()
 
-	if path, l, e := writeToFile(c.Dir, key, r); e != nil {
+	if path, l, e := writeFile(c.Dir, key, r); e != nil {
 		return e
 	} else {
 		if e := c.validate(path, l); e != nil {
@@ -63,14 +63,14 @@ func (c *Cache) validate(path string, length int64) error {
 			return e
 		}
 	}
-	if length + c.StorageSizeUsed <= c.StorageSize && c.TotalFilesWritten + 1 <= c.TotalFilesToBeWritten {
+	if length+c.StorageSizeUsed <= c.StorageSize && c.TotalFilesWritten+1 <= c.TotalFilesToBeWritten {
 		return nil
-	} else if length + c.StorageSizeUsed >= c.StorageSize {
+	} else if length+c.StorageSizeUsed >= c.StorageSize {
 		if e := c.removeLast(); e != nil {
 			return e
 		}
 		c.validate(path, length)
-	} else if c.TotalFilesWritten + 1 >= c.TotalFilesToBeWritten {
+	} else if c.TotalFilesWritten+1 >= c.TotalFilesToBeWritten {
 		if e := c.removeLast(); e != nil {
 			return e
 		}
@@ -85,7 +85,7 @@ func (c *Cache) removeLast() error {
 		item := last.Value.(*ItemMeta)
 		if e := os.Remove(item.Path); e == nil {
 			c.StorageSizeUsed -= item.Size
-			c.TotalFilesWritten --
+			c.TotalFilesWritten--
 			delete(c.Items, item.Key)
 			c.ItemsList.Remove(last)
 			return nil
@@ -100,13 +100,13 @@ func (c *Cache) removeLast() error {
 // Update the cache.
 func (c *Cache) onAdd(key, path string, length int64) {
 	c.StorageSizeUsed += length
-	c.TotalFilesWritten ++
+	c.TotalFilesWritten++
 	if item, ok := c.Items[key]; ok {
 		c.ItemsList.Remove(item)
 	}
 
-	item := &ItemMeta {
-		Key: key,
+	item := &ItemMeta{
+		Key:  key,
 		Size: length,
 		Path: path,
 	}

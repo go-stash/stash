@@ -1,10 +1,10 @@
 package stash
 
 import (
-	"testing"
-	"time"
 	"math/rand"
 	"os"
+	"testing"
+	"time"
 )
 
 const charset = "abcdefghijklmnopqrstuvwxyz" +
@@ -29,11 +29,11 @@ func TestGet(t *testing.T) {
 	//here we create a directory to hold the temp file
 	dir := getCacheDir("stash_cache_file_write_test")
 	defer deleteCacheDir(dir)
-	path := dir + string(os.PathSeparator) + getFileName(key)
+	path := dir + string(os.PathSeparator) + shasum(key)
 	f, e := os.Create(path)
 	checkError(e)
 	var l int64 = 10000000
-	e = f.Truncate(l)//we create a 10MB file
+	e = f.Truncate(l) //we create a 10MB file
 	checkError(e)
 	//create stash object
 	c := getCacheDir("stash_cache_file_read_write_test")
@@ -48,11 +48,11 @@ func TestAdd(t *testing.T) {
 	//here we create a directory to hold the temp file
 	dir := getCacheDir("stash_cache_file_write_test")
 	defer deleteCacheDir(dir)
-	path := dir + string(os.PathSeparator) + getFileName(key)
+	path := dir + string(os.PathSeparator) + shasum(key)
 	f, e := os.Create(path)
 	checkError(e)
 	var l int64 = 10000000
-	e = f.Truncate(l)//we create a 10MB file
+	e = f.Truncate(l) //we create a 10MB file
 	checkError(e)
 	//create stash object
 	c := getCacheDir("stash_cache_file_read_write_test")
@@ -69,11 +69,11 @@ func TestAdd(t *testing.T) {
 		t.Fatal(e)
 	}
 	secondKey := "b"
-	path = dir + string(os.PathSeparator) + getFileName(secondKey)
+	path = dir + string(os.PathSeparator) + shasum(secondKey)
 	f, e = os.Create(path)
 	checkError(e)
 	var l2 int64 = 100000000
-	e = f.Truncate(l2)//we create a 10MB file
+	e = f.Truncate(l2) //we create a 10MB file
 	checkError(e)
 	if e := s.AddFrom(secondKey, f); e != ErrFileSizeExceedsStorageSize {
 		t.Fatalf("Error not equal (%#v!=%#v)", e, ErrFileSizeExceedsStorageSize)

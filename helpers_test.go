@@ -4,11 +4,11 @@ import (
 	/*"testing"
 	"fmt"
 	"crypto/md5"*/
+	"bufio"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
-	"io"
-	"bufio"
 )
 
 var (
@@ -46,7 +46,7 @@ func deleteCacheDir(dir string) {
 
 func getFile() (io.Reader, string) {
 	dir := getCacheDir("stash_cache_file_write_test")
-	path := dir + string(os.PathSeparator) + getFileName(key)
+	path := dir + string(os.PathSeparator) + shasum(key)
 	f, e := os.Create(path)
 	checkError(e)
 	w := bufio.NewWriter(f)
