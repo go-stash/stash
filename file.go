@@ -33,20 +33,26 @@ func writeFileValidate(c *Cache,
 		return "", 0, &FileError{dir, key, err}
 	}
 	var total int64
-	chunkSize := int64(1024)
+	chunkSize := 1024
+	buffer := make([]byte, 0, chunkSize)
 	for {
 		// validate
-		if err := c.validate(path, chunkSize); err != nil {
+		if err := c.validate(path, int64(chunkSize)); err != nil {
 			return path, 0, err
 		}
 
 		// copy
-		n, err := io.CopyN(f, r, 1024)
+		n, err := r.Read(buffer)
 		if err != nil {
 			return "", 0, &FileError{dir, key, err}
 		}
 
-		total += n
+		w, err := f.Write(buffer)
+		if err != nil {
+			return "", 0, &FileError{dir, key, err}
+		}
+
+		total += int64(w)
 		if n <= chunkSize {
 			break
 		}
