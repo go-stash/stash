@@ -53,7 +53,7 @@ func writeFileValidate(c *Cache,
 		}
 
 		total += int64(w)
-		if n <= chunkSize {
+		if n < chunkSize {
 			break
 		}
 	}
