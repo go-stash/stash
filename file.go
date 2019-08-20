@@ -47,7 +47,7 @@ func writeFileValidate(c *Cache,
 			return "", 0, &FileError{dir, key, err}
 		}
 
-		w, err := f.Write(buffer)
+		w, err := f.WriteAt(buffer, total)
 		if err != nil {
 			return "", 0, &FileError{dir, key, err}
 		}
