@@ -67,7 +67,23 @@ func (c *Cache) PutReader(key string, r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	if err := c.validate(path, n); err != nil { // XXX(hjr265): We should validate before storing the file.
+	if err := c.validate(path, n); err != nil {
+		return err
+	}
+	c.addMeta(key, path, n)
+	return nil
+}
+
+// PutReaderChunked adds the contents of a reader, validating size for single chunk
+func (c *Cache) PutReaderChunked(key string, r io.Reader) error {
+	c.l.Lock()
+	defer c.l.Unlock()
+
+	path, n, err := writeFileValidate(c, c.dir, key, r)
+	if err != nil {
+		return err
+	}
+	if err := c.validate(path, n); err != nil {
 		return err
 	}
 	c.addMeta(key, path, n)
