@@ -33,8 +33,8 @@ func writeFileValidate(c *Cache,
 		return "", 0, &FileError{dir, key, err}
 	}
 	var total int64
-	chunkSize := 1024
-	buffer := make([]byte, 0, chunkSize)
+	chunkSize := 1024 * 1024
+	buffer := make([]byte, chunkSize)
 	for {
 		// validate
 		if err := c.validate(path, int64(chunkSize)); err != nil {
