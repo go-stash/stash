@@ -3,6 +3,7 @@ package stash
 import (
 	"bytes"
 	"container/list"
+	"github.com/pkg/errors"
 	"io"
 	"os"
 	"sort"
@@ -70,6 +71,7 @@ func (c *Cache) PutReader(key string, r io.Reader) error {
 	if err := c.validate(path, n); err != nil {
 		return err
 	}
+
 	c.addMeta(key, path, n)
 	return nil
 }
@@ -81,11 +83,9 @@ func (c *Cache) PutReaderChunked(key string, r io.Reader) error {
 
 	path, n, err := writeFileValidate(c, c.dir, key, r)
 	if err != nil {
-		return err
+		return errors.WithStack(os.Remove(path))
 	}
-	if err := c.validate(path, n); err != nil {
-		return err
-	}
+
 	c.addMeta(key, path, n)
 	return nil
 }
@@ -123,7 +123,7 @@ func (c *Cache) Keys() []string {
 // validate ensures the file satisfies the constraints of the cache.
 func (c *Cache) validate(path string, n int64) error {
 	if n > c.size {
-		os.Remove(path) // XXX(hjr265): We should not supress this error even if it is very unlikely.
+		os.Remove(path) // XXX(hjr265): We should not suppress this error even if it is very unlikely.
 		return &FileError{c.dir, "", ErrTooLarge}
 	}
 
@@ -144,7 +144,7 @@ func (c *Cache) validate(path string, n int64) error {
 	return nil
 }
 
-// evitLast removes the last file following the LRU policy.
+// evitcLast removes the last file following the LRU policy.
 func (c *Cache) evictLast() error {
 	if last := c.list.Back(); last != nil {
 		item := last.Value.(*Meta)
