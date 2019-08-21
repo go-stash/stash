@@ -5,7 +5,18 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 )
+
+type exoBuffer struct {
+	bytes []byte
+}
+
+var s3FsPool = sync.Pool{
+	New: func() interface{} {
+		return &exoBuffer{make([]byte, 4*1024*1024)}
+	},
+}
 
 // writeFile writes a new file to the cache storage.
 func writeFile(dir, key string, r io.Reader) (string, int64, error) {
@@ -34,7 +45,9 @@ func writeFileValidate(c *Cache,
 	}
 	var total int64
 	chunkSize := 1024 * 1024
-	buffer := make([]byte, chunkSize)
+	exoBuf := s3FsPool.Get().(*exoBuffer)
+	defer s3FsPool.Put(exoBuf)
+
 	for {
 		// validate
 		if err := c.validate(path, int64(chunkSize)); err != nil {
@@ -42,12 +55,12 @@ func writeFileValidate(c *Cache,
 		}
 
 		// copy
-		n, err := r.Read(buffer)
+		n, err := r.Read(exoBuf.bytes)
 		if err != nil {
 			return "", 0, &FileError{dir, key, err}
 		}
 
-		w, err := f.WriteAt(buffer[0:n], total)
+		w, err := f.WriteAt(exoBuf.bytes[0:n], total)
 		if err != nil {
 			return "", 0, &FileError{dir, key, err}
 		}
