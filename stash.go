@@ -92,8 +92,8 @@ func (c *Cache) PutReaderChunked(key string, r io.Reader) error {
 
 // Get returns a reader for a blob in the cache, or ErrNotFound otherwise.
 func (c *Cache) Get(key string) (io.ReadCloser, error) {
-	c.l.RLock()
-	defer c.l.RUnlock()
+	c.l.Lock()
+	defer c.l.Unlock()
 
 	if item, ok := c.m[key]; ok {
 		c.list.MoveToFront(item)
