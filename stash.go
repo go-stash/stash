@@ -56,6 +56,12 @@ func New(dir string, sz, c int64) (*Cache, error) {
 
 // Put adds a byte slice as a blob to the cache against the given key.
 func (c *Cache) Put(key string, val []byte) error {
+	if float64(c.sizeUsed * 100) / float64(c.size) > 90 {
+		err := c.evictLast()
+		if err != nil {
+			return errors.WithStack(err)
+		}
+	}
 	return c.PutReader(key, bytes.NewReader(val))
 }
 
