@@ -28,7 +28,7 @@ type Cache struct {
 	list *list.List               // List of items in cache
 	m    map[string]*list.Element // Map of items in list
 
-	l sync.RWMutex
+	l sync.Mutex
 }
 
 // New creates a Cache backed by dir on disk. The cache allows at most c files of total size sz.

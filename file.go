@@ -38,7 +38,9 @@ func writeFileValidate(c *Cache,
 	dir, key string, r io.Reader) (string, int64, error) {
 
 	path := realFilePath(dir, key)
-	f, err := os.Create(path)
+	tmpPath := path + ".tmp"
+
+	f, err := os.Create(tmpPath)
 	defer f.Close()
 	if err != nil {
 		return "", 0, &FileError{dir, key, err}
@@ -50,25 +52,29 @@ func writeFileValidate(c *Cache,
 
 	for {
 		// validate
-		if err := c.validate(path, total + int64(chunkSize)); err != nil {
-			return path, 0, err
+		if err := c.validate(tmpPath, int64(chunkSize)); err != nil {
+			return tmpPath, 0, err
 		}
 
 		// copy
 		n, err := r.Read(exoBuf.bytes)
 		if err != nil {
-			return "", 0, &FileError{dir, key, err}
+			return tmpPath, 0, &FileError{dir, key, err}
 		}
 
 		w, err := f.WriteAt(exoBuf.bytes[0:n], total)
 		if err != nil {
-			return "", 0, &FileError{dir, key, err}
+			return tmpPath, 0, &FileError{dir, key, err}
 		}
 
 		total += int64(w)
 		if n < chunkSize {
 			break
 		}
+	}
+	err = os.Rename(tmpPath, path)
+	if err != nil {
+		return tmpPath, 0, &FileError{dir, key, err}
 	}
 	return path, total, nil
 }
