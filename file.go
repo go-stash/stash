@@ -50,7 +50,7 @@ func writeFileValidate(c *Cache,
 
 	for {
 		// validate
-		if err := c.validate(path, int64(chunkSize)); err != nil {
+		if err := c.validate(path, total + int64(chunkSize)); err != nil {
 			return path, 0, err
 		}
 
