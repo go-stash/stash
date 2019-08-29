@@ -60,6 +60,8 @@ func writeFileValidate(c *Cache,
 		n, errRead := r.Read(exoBuf.bytes)
 		if n <=0 && errRead != nil {
 			return tmpPath, 0, &FileError{dir, key, err}
+		} else if n == 0 && errRead != nil {
+			break
 		}
 
 		w, err := f.WriteAt(exoBuf.bytes[0:n], total)
@@ -68,9 +70,6 @@ func writeFileValidate(c *Cache,
 		}
 
 		total += int64(w)
-		if n < chunkSize {
-			break
-		}
 	}
 	err = os.Rename(tmpPath, path)
 	if err != nil {
