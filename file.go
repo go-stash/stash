@@ -12,9 +12,10 @@ type exoBuffer struct {
 	bytes []byte
 }
 
-var s3FsPool = sync.Pool{
+const chunkSize = 4 * 1024 * 1024
+var s3FsPool = sync.Pool {
 	New: func() interface{} {
-		return &exoBuffer{make([]byte, 4*1024*1024)}
+		return &exoBuffer{make([]byte, chunkSize)}
 	},
 }
 
@@ -46,7 +47,6 @@ func writeFileValidate(c *Cache,
 		return "", 0, &FileError{dir, key, err}
 	}
 	var total int64
-	chunkSize := 1024 * 1024
 	exoBuf := s3FsPool.Get().(*exoBuffer)
 	defer s3FsPool.Put(exoBuf)
 
