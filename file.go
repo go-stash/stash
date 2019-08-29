@@ -42,10 +42,10 @@ func writeFileValidate(c *Cache,
 	tmpPath := path + ".tmp"
 
 	f, err := os.Create(tmpPath)
-	defer f.Close()
 	if err != nil {
 		return "", 0, &FileError{dir, key, err}
 	}
+
 	var total int64
 	exoBuf := s3FsPool.Get().(*exoBuffer)
 	defer s3FsPool.Put(exoBuf)
@@ -59,6 +59,7 @@ func writeFileValidate(c *Cache,
 		// copy
 		n, errRead := r.Read(exoBuf.bytes)
 		if n <=0 && errRead != nil {
+			_ = f.Close()
 			return tmpPath, 0, &FileError{dir, key, err}
 		} else if n == 0 && errRead != nil {
 			break
@@ -66,15 +67,23 @@ func writeFileValidate(c *Cache,
 
 		w, err := f.WriteAt(exoBuf.bytes[0:n], total)
 		if err != nil {
+			_ = f.Close()
 			return tmpPath, 0, &FileError{dir, key, err}
 		}
 
 		total += int64(w)
 	}
+
+	err = f.Close()
+	if err != nil {
+		return tmpPath, total, &FileError{dir, key, err}
+	}
+
 	err = os.Rename(tmpPath, path)
 	if err != nil {
-		return tmpPath, 0, &FileError{dir, key, err}
+		return tmpPath, total, &FileError{dir, key, err}
 	}
+
 	return path, total, nil
 }
 
