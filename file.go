@@ -58,11 +58,11 @@ func writeFileValidate(c *Cache,
 
 		// copy
 		n, errRead := r.Read(exoBuf.bytes)
-		if n <=0 && errRead != nil {
+		if n == 0 && errRead == io.EOF {
+			break
+		} else if n == 0 && errRead != nil {
 			_ = f.Close()
 			return tmpPath, 0, &FileError{dir, key, err}
-		} else if n == 0 && errRead != nil {
-			break
 		}
 
 		w, err := f.WriteAt(exoBuf.bytes[0:n], total)
