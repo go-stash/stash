@@ -52,9 +52,12 @@ func writeFileValidate(c *Cache,
 
 	for {
 		// validate
+		c.l.Lock()
 		if err := c.validate(tmpPath, int64(chunkSize)); err != nil {
+			c.l.Unlock()
 			return tmpPath, 0, err
 		}
+		c.l.Unlock()
 
 		// copy
 		n, errRead := r.Read(exoBuf.bytes)

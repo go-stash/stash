@@ -78,15 +78,14 @@ func (c *Cache) PutReader(key string, r io.Reader) error {
 
 // PutReaderChunked adds the contents of a reader, validating size for single chunk
 func (c *Cache) PutReaderChunked(key string, r io.Reader) error {
-	c.l.Lock()
-	defer c.l.Unlock()
-
 	path, n, err := writeFileValidate(c, c.dir, key, r)
 	if err != nil {
 		return errors.WithStack(os.Remove(path))
 	}
 
+	c.l.Lock()
 	c.addMeta(key, path, n)
+	c.l.Unlock()
 	return nil
 }
 
