@@ -57,8 +57,8 @@ func writeFileValidate(c *Cache,
 		}
 
 		// copy
-		n, err := r.Read(exoBuf.bytes)
-		if err != nil {
+		n, errRead := r.Read(exoBuf.bytes)
+		if n <=0 && errRead != nil {
 			return tmpPath, 0, &FileError{dir, key, err}
 		}
 
