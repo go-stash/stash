@@ -12,6 +12,21 @@ import (
 
 var storageDir string
 
+func capStorage() int {
+	dir, err := os.Open(storageDir)
+	defer dir.Close()
+
+	if err != nil {
+		return -1
+	}
+
+	if fs, err := dir.Readdirnames(-1); err == nil {
+		return len(fs)
+	}
+
+	return -1
+}
+
 // clearStorage empties the temporary storage directory
 func clearStorage() {
 	err := os.RemoveAll(storageDir)
@@ -57,6 +72,32 @@ func TestNew(t *testing.T) {
 		if err != c.err {
 			t.Fatalf("#%d: Expected err == %q, got %q", i+1, c.err, err)
 		}
+	}
+}
+
+func TestClear(t *testing.T) {
+	clearStorage()
+	s, err := New(storageDir, 2048000, 40)
+	catch(err)
+	for k, b := range blobs {
+		err := s.Put(k, b)
+		catch(err)
+	}
+	cl := s.Cap()
+	if cl != int64(len(blobs)) {
+		t.Fatalf("Expected cap == %d, got %d", len(blobs), cl)
+	}
+
+	cs := capStorage()
+	if cs != len(blobs) {
+		t.Fatalf("Expected capStorage == %d, got %d", len(blobs), cs)
+	}
+
+	s.Clear()
+
+	cs = capStorage()
+	if cs != 0 {
+		t.Fatalf("Expected capStorage == 0, got %d", cs)
 	}
 }
 
