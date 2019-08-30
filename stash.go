@@ -24,6 +24,8 @@ type Cache struct {
 	maxCap  int64  // Total number of files allowed
 	size    int64  // Total size of files added
 	cap     int64  // Total number of files added
+	hit     int64  // Cache hit
+	miss    int64  // Cache miss...
 
 	list *list.List               // List of items in cache
 	m    map[string]*list.Element // Map of items in list
@@ -100,11 +102,30 @@ func (c *Cache) Get(key string) (io.ReadCloser, error) {
 		if f, err := os.Open(path); err != nil {
 			return nil, err
 		} else {
+			c.hit++
 			return f, nil
 		}
 	} else {
+		c.miss++
 		return nil, ErrNotFound
 	}
+}
+
+// Return Cache stats.
+func (c *Cache) Stats() (int64, int64, int64, int64) {
+	return c.size, c.cap, c.hit, c.miss
+}
+
+func (c *Cache) Empty() bool {
+	return c.cap == 0
+}
+
+func (c *Cache) Cap() int64 {
+	return c.cap
+}
+
+func (c *Cache) Size() int64 {
+	return c.size
 }
 
 // Keys returns a list of keys in the cache.
