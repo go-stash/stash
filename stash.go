@@ -60,11 +60,18 @@ func New(dir string, sz, c int64) (*Cache, error) {
 func (c *Cache) Put(key string, val []byte) error {
 	return c.PutReader(key, bytes.NewReader(val))
 }
+func (c *Cache) UnlockedPut(key string, val []byte) error {
+	return c.UnlockedPutReader(key, bytes.NewReader(val))
+}
 
 // PutReader adds the contents of a reader as a blob to the cache against the given key.
 func (c *Cache) PutReader(key string, r io.Reader) error {
 	c.l.Lock()
 	defer c.l.Unlock()
+	return c.UnlockedPutReader(key, r)
+}
+
+func (c *Cache) UnlockedPutReader(key string, r io.Reader) error {
 
 	path, n, err := writeFile(c.dir, key, r)
 	if err != nil {
@@ -80,14 +87,24 @@ func (c *Cache) PutReader(key string, r io.Reader) error {
 
 // PutReaderChunked adds the contents of a reader, validating size for single chunk
 func (c *Cache) PutReaderChunked(key string, r io.Reader) error {
+	return c.LockablePutReaderChunked(key, r, &c.l)
+}
+func (c *Cache) UnlockedPutReaderChunked(key string, r io.Reader) error {
+	return c.LockablePutReaderChunked(key, r, nil)
+}
+
+func (c *Cache) LockablePutReaderChunked(key string, r io.Reader, m *sync.Mutex) error {
 	path, n, err := writeFileValidate(c, c.dir, key, r)
 	if err != nil {
 		return errors.WithStack(os.Remove(path))
 	}
 
-	c.l.Lock()
+	if m != nil {
+		m.Lock()
+		defer m.Unlock()
+	}
+
 	c.addMeta(key, path, n)
-	c.l.Unlock()
 	return nil
 }
 
@@ -95,7 +112,9 @@ func (c *Cache) PutReaderChunked(key string, r io.Reader) error {
 func (c *Cache) Get(key string) (io.ReadCloser, error) {
 	c.l.Lock()
 	defer c.l.Unlock()
-
+	return c.UnlockedGet(key)
+}
+func (c *Cache) UnlockedGet(key string) (io.ReadCloser, error) {
 	if item, ok := c.m[key]; ok {
 		c.list.MoveToFront(item)
 		path := item.Value.(*Meta).Path
@@ -115,7 +134,9 @@ func (c *Cache) Get(key string) (io.ReadCloser, error) {
 func (c *Cache) Delete(key string) error {
 	c.l.Lock()
 	defer c.l.Unlock()
-
+	return c.UnlockedDelete(key)
+}
+func (c *Cache) UnlockedDelete(key string) error {
 	elem, ok := c.m[key]
 	if !ok {
 		return ErrNotFound
@@ -134,29 +155,46 @@ func (c *Cache) Delete(key string) error {
 func (c *Cache) Stats() (int64, int64, int64, int64) {
 	c.l.Lock()
 	defer c.l.Unlock()
+	return c.UnlockedStats()
+}
+func (c *Cache) UnlockedStats() (int64, int64, int64, int64) {
 	return c.size, c.cap, c.hit, c.miss
 }
 
 func (c *Cache) Empty() bool {
 	c.l.Lock()
 	defer c.l.Unlock()
+	return c.UnlockedEmpty()
+}
+func (c *Cache) UnlockedEmpty() bool {
 	return c.cap == 0
 }
 
 func (c *Cache) Cap() int64 {
 	c.l.Lock()
 	defer c.l.Unlock()
+	return c.UnlockedCap()
+}
+func (c *Cache) UnlockedCap() int64 {
 	return c.cap
 }
 
 func (c *Cache) Size() int64 {
 	c.l.Lock()
 	defer c.l.Unlock()
+	return c.UnlockedSize()
+}
+func (c *Cache) UnlockedSize() int64 {
 	return c.size
 }
 
 // Keys returns a list of keys in the cache.
 func (c *Cache) Keys() []string {
+	c.l.Lock()
+	defer c.l.Unlock()
+	return c.UnlockedKeys()
+}
+func (c *Cache) UnlockedKeys() []string {
 	keys := make([]string, len(c.m))
 	i := 0
 	for item := c.list.Back(); item != nil; item = item.Prev() {
@@ -167,7 +205,10 @@ func (c *Cache) Keys() []string {
 	return keys
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // validate ensures the file satisfies the constraints of the cache.
+
 func (c *Cache) validate(path string, n int64) error {
 	if n > c.maxSize {
 		os.Remove(path) // XXX(hjr265): We should not suppress this error even if it is very unlikely.
