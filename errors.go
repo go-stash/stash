@@ -4,11 +4,9 @@ import "errors"
 
 var (
 	ErrNotFound = errors.New("not found")
-
-	ErrBadDir  = errors.New("invalid directory")
-	ErrBadSize = errors.New("storage size must be greater then zero")
-	ErrBadCap  = errors.New("file number must be greater then zero")
-
+	ErrBadDir   = errors.New("invalid directory")
+	ErrBadSize  = errors.New("storage size must be greater then zero")
+	ErrBadCap   = errors.New("file number must be greater then zero")
 	ErrTooLarge = errors.New("file size must be less or equal storage size")
 )
 

@@ -13,7 +13,8 @@ type exoBuffer struct {
 }
 
 const chunkSize = 4 * 1024 * 1024
-var s3FsPool = sync.Pool {
+
+var s3FsPool = sync.Pool{
 	New: func() interface{} {
 		return &exoBuffer{make([]byte, chunkSize)}
 	},
