@@ -8,7 +8,7 @@ Improved Go package for disk-based blob cache.
 
 Install Stash using the go get command:
 
-    $ go get https://github.com/RstorLabs/stash.v1.1.0 
+    $ go get github.com/RstorLabs/stash
 
 The only dependency is the Go distribution.
 
