@@ -124,6 +124,7 @@ func (c *Cache) Delete(key string) error {
 	item := elem.Value.(*Meta)
 	c.size -= item.Size
 	c.cap--
+	os.Remove(item.Path)
 	delete(c.m, item.Key)
 	c.list.Remove(elem)
 	return nil
