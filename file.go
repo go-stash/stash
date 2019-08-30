@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"sync"
 )
 
@@ -91,15 +92,11 @@ func writeFileValidate(c *Cache,
 	return path, total, nil
 }
 
-func filepath(dir, name string) string {
-	return dir + string(os.PathSeparator) + name
-}
-
 func shasum(v string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(v)))
 }
 
 func realFilePath(dir, key string) string {
 	name := shasum(key)
-	return filepath(dir, name)
+	return path.Join(dir, name)
 }

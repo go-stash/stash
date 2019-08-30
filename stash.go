@@ -5,8 +5,8 @@ import (
 	"container/list"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
-	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -45,7 +45,7 @@ func New(dir string, sz, c int64) (*Cache, error) {
 		return nil, ErrBadCap
 	}
 
-	dir = strings.TrimRight(dir, string(os.PathSeparator)) // Clean path to dir
+	dir = filepath.Clean(dir)
 
 	return &Cache{
 		dir:     dir,
@@ -227,6 +227,5 @@ func (c *Cache) addMeta(key, path string, length int64) {
 
 func validDir(dir string) bool {
 	// XXX(hjr265): We need to ensure the disk is either empty, or contains a valid cache storage.
-
 	return dir != ""
 }

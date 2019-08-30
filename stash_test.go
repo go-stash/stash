@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path"
 	"reflect"
 	"testing"
 )
@@ -70,7 +71,7 @@ func TestCachePut(t *testing.T) {
 	}
 
 	for k, b := range blobs {
-		path := filepath(storageDir, shasum(k))
+		path := path.Join(storageDir, shasum(k))
 		v, err := ioutil.ReadFile(path)
 		catch(err)
 		if !bytes.Equal(b, v) {
