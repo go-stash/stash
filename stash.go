@@ -151,7 +151,7 @@ func (c *Cache) UnlockedDelete(key string) error {
 	return nil
 }
 
-// Return Cache stats.
+// Cache stats...
 func (c *Cache) Stats() (int64, int64, int64, int64) {
 	c.l.Lock()
 	defer c.l.Unlock()
@@ -159,6 +159,16 @@ func (c *Cache) Stats() (int64, int64, int64, int64) {
 }
 func (c *Cache) UnlockedStats() (int64, int64, int64, int64) {
 	return c.size, c.cap, c.hit, c.miss
+}
+
+func (c *Cache) ResetStats() {
+	c.l.Lock()
+	defer c.l.Unlock()
+	c.UnlockedResetStats()
+}
+func (c *Cache) UnlockedResetStats() {
+	c.hit = 0
+	c.miss = 0
 }
 
 func (c *Cache) Empty() bool {
