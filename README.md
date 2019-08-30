@@ -1,6 +1,6 @@
 # Stash
 
-A Go package for disk-based blob cache.
+Improved Go package for disk-based blob cache.
 
 ![](https://github.com/go-stash/stash/raw/master/folder.png)
 
@@ -8,17 +8,13 @@ A Go package for disk-based blob cache.
 
 Install Stash using the go get command:
 
-    $ go get gopkg.in/stash.v1
+    $ go get https://github.com/RstorLabs/stash.v1.1.0 
 
 The only dependency is the Go distribution.
 
 ## Motivation
 
 This package allows us to reduce calls to our blob storage by caching the most recently used blobs to disk.
-
-## Documentation
-
-- [Reference](https://godoc.org/gopkg.in/stash.v1)
 
 ## Contributing
 
