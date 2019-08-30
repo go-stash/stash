@@ -47,13 +47,49 @@ func New(dir string, sz, c int64) (*Cache, error) {
 
 	dir = filepath.Clean(dir)
 
-	return &Cache{
+	cache := &Cache{
 		dir:     dir,
 		maxSize: sz,
 		maxCap:  c,
 		list:    list.New(),
 		m:       make(map[string]*list.Element),
-	}, nil
+	}
+
+	if err := cache.UnlockedClear(); err != nil {
+		return nil, err
+	}
+	return cache, nil
+}
+
+// Clear the cache, erase the cache files from the directory
+
+func (c *Cache) Clear() error {
+	c.l.Lock()
+	defer c.l.Unlock()
+	return c.UnlockedClear()
+}
+
+func (c *Cache) UnlockedClear() error {
+	c.size = 0
+	c.cap = 0
+	c.UnlockedResetStats()
+	c.list = list.New()
+	c.m = make(map[string]*list.Element)
+
+	d, err := os.Open(c.dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+
+	names, err := d.Readdirnames(-1)
+	if err == nil {
+		for _, name := range names {
+			os.RemoveAll(filepath.Join(c.dir, name))
+		}
+	}
+
+	return nil
 }
 
 // Put adds a byte slice as a blob to the cache against the given key.
