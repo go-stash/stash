@@ -131,18 +131,26 @@ func (c *Cache) Delete(key string) error {
 
 // Return Cache stats.
 func (c *Cache) Stats() (int64, int64, int64, int64) {
+	c.l.Lock()
+	defer c.l.Unlock()
 	return c.size, c.cap, c.hit, c.miss
 }
 
 func (c *Cache) Empty() bool {
+	c.l.Lock()
+	defer c.l.Unlock()
 	return c.cap == 0
 }
 
 func (c *Cache) Cap() int64 {
+	c.l.Lock()
+	defer c.l.Unlock()
 	return c.cap
 }
 
 func (c *Cache) Size() int64 {
+	c.l.Lock()
+	defer c.l.Unlock()
 	return c.size
 }
 
