@@ -79,6 +79,57 @@ func TestCachePut(t *testing.T) {
 	}
 }
 
+func TestCacheDeleteAndStats(t *testing.T) { // cache
+	clearStorage()
+
+	s, err := New(storageDir, 2048000, 40)
+	catch(err)
+	for k, b := range blobs {
+		err := s.Put(k, b)
+		catch(err)
+	}
+
+	if _, err := s.Get("missing"); err == nil {
+		t.Fatalf("Miss Expected!")
+	}
+	_, c, h, m := s.Stats()
+	if c != int64(len(blobs)) {
+		t.Fatalf("Expected cap == %v, got %v", len(blobs), c)
+	}
+
+	if h != 0 {
+		t.Fatalf("Expected hit == 0, got %v", m)
+	}
+
+	s.Get("gopher")
+	s.Get("gopher")
+
+	if _, _, h, _ := s.Stats(); h != 2 {
+		t.Fatalf("Expected hit == 2, got %v", h)
+	}
+
+	if m != 1 {
+		t.Fatalf("Expected miss == 1, got %v", m)
+	}
+
+	for k, _ := range blobs {
+		if err := s.Delete(k); err != nil {
+			t.Fatalf("Unexpected error when deleting a file!")
+		}
+	}
+
+	if err := s.Delete("missing"); err == nil {
+		t.Fatalf("Expected error when deleting a missing file!")
+	}
+
+	if !s.Empty() {
+		t.Fatalf("Expected empty cache!")
+	}
+
+	if s.Size() != 0 {
+		t.Fatalf("Expected cache with size == 0!")
+	}
+}
 func TestSizeEviction(t *testing.T) {
 	clearStorage()
 
