@@ -111,6 +111,24 @@ func (c *Cache) Get(key string) (io.ReadCloser, error) {
 	}
 }
 
+// Delete a key from the cache, return error in case of key not present.
+func (c *Cache) Delete(key string) error {
+	c.l.Lock()
+	defer c.l.Unlock()
+
+	elem, ok := c.m[key]
+	if !ok {
+		return ErrNotFound
+	}
+
+	item := elem.Value.(*Meta)
+	c.size -= item.Size
+	c.cap--
+	delete(c.m, item.Key)
+	c.list.Remove(elem)
+	return nil
+}
+
 // Return Cache stats.
 func (c *Cache) Stats() (int64, int64, int64, int64) {
 	return c.size, c.cap, c.hit, c.miss
