@@ -16,6 +16,7 @@ type Meta struct {
 	Key  string
 	Size int64
 	Path string
+	Tag  []byte // user annotation
 }
 
 type Cache struct {
@@ -92,22 +93,68 @@ func (c *Cache) UnlockedClear() error {
 	return nil
 }
 
+// SetTag simple sets a binary Tag to the cached key element.
+func (c *Cache) SetTag(key string, tag []byte) error {
+	c.l.Lock()
+	defer c.l.Unlock()
+	return c.SetTagUnlocked(key, tag)
+}
+
+// SetTagUnlocked is the concurrency unsafe version of SetTag.
+func (c *Cache) SetTagUnlocked(key string, tag []byte) error {
+	if item, ok := c.m[key]; ok {
+		item.Value.(*Meta).Tag = tag
+		return nil
+	}
+	return ErrNotFound
+}
+
+// GetTag retrieves the tag associated with the key.
+func (c *Cache) GetTag(key string) ([]byte, error) {
+	c.l.Lock()
+	defer c.l.Unlock()
+	return c.GetTagUnlocked(key)
+}
+
+// GetTagUnlocked is the concurrency unsafe version of GetTag.
+func (c *Cache) GetTagUnlocked(key string) ([]byte, error) {
+	if item, ok := c.m[key]; ok {
+		return item.Value.(*Meta).Tag, nil
+	}
+	return nil, ErrNotFound
+}
+
 // Put adds a byte slice as a blob to the cache against the given key.
 func (c *Cache) Put(key string, val []byte) error {
 	return c.PutReader(key, bytes.NewReader(val))
 }
-func (c *Cache) UnlockedPut(key string, val []byte) error {
-	return c.UnlockedPutReader(key, bytes.NewReader(val))
+
+// Put like Put, adds a byte slice as a blob along with a tag annotation.
+func (c *Cache) PutWithTag(key string, tag, val []byte) error {
+	return c.PutReaderWithTag(key, tag, bytes.NewReader(val))
+}
+
+// UnlockedPutWithTag is the concurrency unsafe version of PutWithTag.
+func (c *Cache) UnlockedPutWithTag(key string, tag, val []byte) error {
+	return c.UnlockedPutReaderWithTag(key, tag, bytes.NewReader(val))
 }
 
 // PutReader adds the contents of a reader as a blob to the cache against the given key.
 func (c *Cache) PutReader(key string, r io.Reader) error {
 	c.l.Lock()
 	defer c.l.Unlock()
-	return c.UnlockedPutReader(key, r)
+	return c.UnlockedPutReaderWithTag(key, nil, r)
 }
 
-func (c *Cache) UnlockedPutReader(key string, r io.Reader) error {
+// PutReaderWithTag like PutReader, adds the contents of a reader as blog along with a tag annotation against the given key.
+func (c *Cache) PutReaderWithTag(key string, tag []byte, r io.Reader) error {
+	c.l.Lock()
+	defer c.l.Unlock()
+	return c.UnlockedPutReaderWithTag(key, tag, r)
+}
+
+// UnlockedPutReaderWithTag is the concurrency unsafe version of PutReaderWithTag.
+func (c *Cache) UnlockedPutReaderWithTag(key string, tag []byte, r io.Reader) error {
 
 	path, n, err := writeFile(c.dir, key, r)
 	if err != nil {
@@ -117,19 +164,27 @@ func (c *Cache) UnlockedPutReader(key string, r io.Reader) error {
 		return err
 	}
 
-	c.addMeta(key, path, n)
+	c.addMeta(key, tag, path, n)
 	return nil
 }
 
 // PutReaderChunked adds the contents of a reader, validating size for single chunk
 func (c *Cache) PutReaderChunked(key string, r io.Reader) error {
-	return c.LockablePutReaderChunked(key, r, &c.l)
-}
-func (c *Cache) UnlockedPutReaderChunked(key string, r io.Reader) error {
-	return c.LockablePutReaderChunked(key, r, nil)
+	return c.LockablePutReaderChunkedWithTag(key, nil, r, &c.l)
 }
 
-func (c *Cache) LockablePutReaderChunked(key string, r io.Reader, m *sync.Mutex) error {
+// PutReaderChunkedWithTag, like PutReaderChunked, adds the contents of a reader along with a tag annotation.
+func (c *Cache) PutReaderChunkedWithTag(key string, tag []byte, r io.Reader) error {
+	return c.LockablePutReaderChunkedWithTag(key, tag, r, &c.l)
+}
+
+// UnlockedPutReaderChunkedWithTag is the concurrency unsafe version of PutReaderChunkedWithTag.
+func (c *Cache) UnlockedPutReaderChunkedWithTag(key string, tag []byte, r io.Reader) error {
+	return c.LockablePutReaderChunkedWithTag(key, tag, r, nil)
+}
+
+// LockablePutReaderChunkedWithTag, like PutReaderChunkedWithTag, only with an extra optional mutex to lock.
+func (c *Cache) LockablePutReaderChunkedWithTag(key string, tag []byte, r io.Reader, m *sync.Mutex) error {
 	path, n, err := writeFileValidate(c, c.dir, key, r)
 	if err != nil {
 		return errors.WithStack(os.Remove(path))
@@ -140,7 +195,7 @@ func (c *Cache) LockablePutReaderChunked(key string, r io.Reader, m *sync.Mutex)
 		defer m.Unlock()
 	}
 
-	c.addMeta(key, path, n)
+	c.addMeta(key, tag, path, n)
 	return nil
 }
 
@@ -148,21 +203,31 @@ func (c *Cache) LockablePutReaderChunked(key string, r io.Reader, m *sync.Mutex)
 func (c *Cache) Get(key string) (io.ReadCloser, error) {
 	c.l.Lock()
 	defer c.l.Unlock()
-	return c.UnlockedGet(key)
+	r, _, e := c.UnlockedGetWithTag(key)
+	return r, e
 }
-func (c *Cache) UnlockedGet(key string) (io.ReadCloser, error) {
+
+// GetWithTag returns a reader for a blob in the cache along with the associated tag, or ErrNotFound otherwise.
+func (c *Cache) GetWithTag(key string) (io.ReadCloser, []byte, error) {
+	c.l.Lock()
+	defer c.l.Unlock()
+	return c.UnlockedGetWithTag(key)
+}
+
+// UnlockedGetWithTag is the concurrency unsafe version of GetWithTag.
+func (c *Cache) UnlockedGetWithTag(key string) (io.ReadCloser, []byte, error) {
 	if item, ok := c.m[key]; ok {
 		c.list.MoveToFront(item)
 		path := item.Value.(*Meta).Path
 		if f, err := os.Open(path); err != nil {
-			return nil, err
+			return nil, nil, err
 		} else {
 			c.hit++
-			return f, nil
+			return f, item.Value.(*Meta).Tag, nil
 		}
 	} else {
 		c.miss++
-		return nil, ErrNotFound
+		return nil, nil, ErrNotFound
 	}
 }
 
@@ -297,7 +362,7 @@ func (c *Cache) evictLast() error {
 }
 
 // addMeta adds meta information to the cache.
-func (c *Cache) addMeta(key, path string, length int64) {
+func (c *Cache) addMeta(key string, tag []byte, path string, length int64) {
 	c.size += length
 	c.cap++
 	if item, ok := c.m[key]; ok {
@@ -306,6 +371,7 @@ func (c *Cache) addMeta(key, path string, length int64) {
 
 	item := &Meta{
 		Key:  key,
+		Tag:  tag,
 		Size: length,
 		Path: path,
 	}
