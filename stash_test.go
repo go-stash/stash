@@ -121,6 +121,19 @@ func TestCachePut(t *testing.T) {
 	}
 }
 
+func TestAlreadyTagged(t *testing.T) {
+	clearStorage()
+
+	s, err := New(storageDir, 2048000, 40)
+	catch(err)
+	err = s.PutWithTag("test", []byte("test"), []byte("content"))
+	catch(err)
+	err = s.SetTag("test", []byte("test2"))
+	if err != ErrAlreadyTagged {
+		t.Fatalf("Expected error == ErrAlreadyTagged, got error '%s'", err)
+	}
+}
+
 func TestCachePutAndGetWithTag(t *testing.T) {
 	clearStorage()
 

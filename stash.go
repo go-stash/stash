@@ -104,8 +104,13 @@ func (c *Cache) SetTag(key string, tag []byte) error {
 // SetTagUnlocked is the concurrency-unsafe version of SetTag.
 func (c *Cache) SetTagUnlocked(key string, tag []byte) error {
 	if item, ok := c.m[key]; ok {
-		item.Value.(*Meta).Tag = tag
-		return nil
+		meta := item.Value.(*Meta)
+		if meta.Tag == nil {
+			item.Value.(*Meta).Tag = tag
+			return nil
+		}
+
+		return ErrAlreadyTagged
 	}
 	return ErrNotFound
 }
