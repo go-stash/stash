@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Meta is the information about the cache entry.
 type Meta struct {
 	Key  string
 	Size int64
@@ -62,14 +63,14 @@ func New(dir string, sz, c int64) (*Cache, error) {
 	return cache, nil
 }
 
-// Clear the cache, erase the cache files from the directory
-
+// Clear resets the cache and erases the files from the cache directory.
 func (c *Cache) Clear() error {
 	c.l.Lock()
 	defer c.l.Unlock()
 	return c.UnlockedClear()
 }
 
+// UnlockedClear is the concurrency unsafe version of Clear function.
 func (c *Cache) UnlockedClear() error {
 	c.size = 0
 	c.cap = 0
@@ -168,7 +169,7 @@ func (c *Cache) UnlockedPutReaderWithTag(key string, tag []byte, r io.Reader) er
 	return nil
 }
 
-// PutReaderChunked adds the contents of a reader, validating size for single chunk
+// PutReaderChunked adds the contents of a reader, validating size chunk.
 func (c *Cache) PutReaderChunked(key string, r io.Reader) error {
 	return c.LockablePutReaderChunkedWithTag(key, nil, r, &c.l)
 }
@@ -237,6 +238,8 @@ func (c *Cache) Delete(key string) error {
 	defer c.l.Unlock()
 	return c.UnlockedDelete(key)
 }
+
+// UnlockedDelete is the concurrency unsafe version of Delete.
 func (c *Cache) UnlockedDelete(key string) error {
 	elem, ok := c.m[key]
 	if !ok {
@@ -252,49 +255,63 @@ func (c *Cache) UnlockedDelete(key string) error {
 	return nil
 }
 
-// Cache stats...
+// Stats returns the Cache stats.
 func (c *Cache) Stats() (int64, int64, int64, int64) {
 	c.l.Lock()
 	defer c.l.Unlock()
 	return c.UnlockedStats()
 }
+
+// UnlockedStats is the concurrency unsafe version of Stats.
 func (c *Cache) UnlockedStats() (int64, int64, int64, int64) {
 	return c.size, c.cap, c.hit, c.miss
 }
 
+// ResetStats resets the statistics of the cache.
 func (c *Cache) ResetStats() {
 	c.l.Lock()
 	defer c.l.Unlock()
 	c.UnlockedResetStats()
 }
+
+// UnlockedResetStats is the concurrency unsafe version of ResetStats.
 func (c *Cache) UnlockedResetStats() {
 	c.hit = 0
 	c.miss = 0
 }
 
+// Empty returns true if the cache is empty.
 func (c *Cache) Empty() bool {
 	c.l.Lock()
 	defer c.l.Unlock()
 	return c.UnlockedEmpty()
 }
+
+// UnlockedEmpty is true if the cache is the concurrency unsafe version of Empty.
 func (c *Cache) UnlockedEmpty() bool {
 	return c.cap == 0
 }
 
+// Cap returns the current capacity of the cache.
 func (c *Cache) Cap() int64 {
 	c.l.Lock()
 	defer c.l.Unlock()
 	return c.UnlockedCap()
 }
+
+// UnlockedCap is the concurrency unsafe version of Cap.
 func (c *Cache) UnlockedCap() int64 {
 	return c.cap
 }
 
+// Size returns the size of the cache.
 func (c *Cache) Size() int64 {
 	c.l.Lock()
 	defer c.l.Unlock()
 	return c.UnlockedSize()
 }
+
+// UnlockedSize is the concurrency unsafe version of Size.
 func (c *Cache) UnlockedSize() int64 {
 	return c.size
 }
@@ -305,6 +322,8 @@ func (c *Cache) Keys() []string {
 	defer c.l.Unlock()
 	return c.UnlockedKeys()
 }
+
+// UnlockedKeys is the concurrency unsafe version of Keys.
 func (c *Cache) UnlockedKeys() []string {
 	keys := make([]string, len(c.m))
 	i := 0
@@ -319,7 +338,6 @@ func (c *Cache) UnlockedKeys() []string {
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // validate ensures the file satisfies the constraints of the cache.
-
 func (c *Cache) validate(path string, n int64) error {
 	if n > c.maxSize {
 		os.Remove(path) // XXX(hjr265): We should not suppress this error even if it is very unlikely.
