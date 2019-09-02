@@ -121,6 +121,44 @@ func TestCachePut(t *testing.T) {
 	}
 }
 
+func TestCachePutAndGetWithTag(t *testing.T) {
+	clearStorage()
+
+	s, err := New(storageDir, 2048000, 40)
+	catch(err)
+	for k, b := range blobs {
+		err := s.PutWithTag(k, []byte(k), b)
+		catch(err)
+	}
+
+	for k, _ := range blobs {
+		_, tag, err := s.GetWithTag(k)
+		catch(err)
+		if !bytes.Equal([]byte(k), tag) {
+			t.Fatalf("Expected tag == %q, got %q", k, tag)
+		}
+	}
+}
+
+func TestCacheSetAndGetTag(t *testing.T) {
+	clearStorage()
+
+	s, err := New(storageDir, 2048000, 40)
+	catch(err)
+	for k, b := range blobs {
+		err := s.Put(k, b)
+		s.SetTag(k, []byte("tag"))
+		catch(err)
+	}
+
+	for k, _ := range blobs {
+		tag, _ := s.GetTag(k)
+		if !bytes.Equal(tag, []byte("tag")) {
+			t.Fatalf("Expected tag == \"tag\", got %q", tag)
+		}
+	}
+}
+
 func TestCacheDeleteAndStats(t *testing.T) { // cache
 	clearStorage()
 
