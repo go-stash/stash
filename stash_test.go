@@ -121,6 +121,35 @@ func TestCachePut(t *testing.T) {
 	}
 }
 
+func TestDeleteIf(t *testing.T) {
+	clearStorage()
+
+	s, err := New(storageDir, 2048000, 40)
+	catch(err)
+	err = s.PutWithTag("test1", []byte("tag1"), []byte("content"))
+	catch(err)
+	err = s.PutWithTag("test2", []byte("tag2"), []byte("content"))
+	catch(err)
+
+	if sz := s.NumEntries(); sz != 2 {
+		t.Fatalf("Expected size == 2, got %d", sz)
+	}
+
+	err = s.DeleteIf("test1", func(tag []byte) bool {
+		return bytes.Equal(tag, []byte("tag1"))
+	})
+	catch(err)
+
+	err = s.DeleteIf("test2", func(tag []byte) bool {
+		return bytes.Equal(tag, []byte("tag1"))
+	})
+	catch(err)
+
+	if sz := s.NumEntries(); sz != 1 {
+		t.Fatalf("Expected size == 1, got %d", sz)
+	}
+}
+
 func TestAlreadyTagged(t *testing.T) {
 	clearStorage()
 
