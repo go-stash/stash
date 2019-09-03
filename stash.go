@@ -105,8 +105,11 @@ func (c *Cache) SetTag(key string, tag []byte) error {
 func (c *Cache) SetTagUnlocked(key string, tag []byte) error {
 	if item, ok := c.m[key]; ok {
 		meta := item.Value.(*Meta)
-		if meta.Tag == nil {
+		switch {
+		case meta.Tag == nil:
 			item.Value.(*Meta).Tag = tag
+			return nil
+		case bytes.Equal(meta.Tag, tag):
 			return nil
 		}
 
