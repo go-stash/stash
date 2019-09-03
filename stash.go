@@ -21,13 +21,13 @@ type Meta struct {
 }
 
 type Cache struct {
-	dir     string // Path to storage directory
-	maxSize int64  // Total size of files allowed
-	maxCap  int64  // Total number of files allowed
-	size    int64  // Total size of files added
-	cap     int64  // Total number of files added
-	hit     int64  // Cache hit
-	miss    int64  // Cache miss...
+	dir        string // Path to storage directory
+	maxSize    int64  // Total size of files allowed
+	maxEntries int64  // Total number of files allowed
+	size       int64  // Total size of files added
+	numEntries int64  // Total number of files added
+	hit        int64  // Cache hit
+	miss       int64  // Cache miss...
 
 	list *list.List               // List of items in cache
 	m    map[string]*list.Element // Map of items in list
@@ -50,11 +50,11 @@ func New(dir string, sz, c int64) (*Cache, error) {
 	dir = filepath.Clean(dir)
 
 	cache := &Cache{
-		dir:     dir,
-		maxSize: sz,
-		maxCap:  c,
-		list:    list.New(),
-		m:       make(map[string]*list.Element),
+		dir:        dir,
+		maxSize:    sz,
+		maxEntries: c,
+		list:       list.New(),
+		m:          make(map[string]*list.Element),
 	}
 
 	if err := cache.UnlockedClear(); err != nil {
@@ -73,7 +73,7 @@ func (c *Cache) Clear() error {
 // UnlockedClear is the concurrency-unsafe version of Clear function.
 func (c *Cache) UnlockedClear() error {
 	c.size = 0
-	c.cap = 0
+	c.numEntries = 0
 	c.UnlockedResetStats()
 	c.list = list.New()
 	c.m = make(map[string]*list.Element)
@@ -257,7 +257,7 @@ func (c *Cache) UnlockedDelete(key string) error {
 
 	item := elem.Value.(*Meta)
 	c.size -= item.Size
-	c.cap--
+	c.numEntries--
 	os.Remove(item.Path)
 	delete(c.m, item.Key)
 	c.list.Remove(elem)
@@ -273,7 +273,7 @@ func (c *Cache) Stats() (int64, int64, int64, int64) {
 
 // UnlockedStats is the concurrency-unsafe version of Stats.
 func (c *Cache) UnlockedStats() (int64, int64, int64, int64) {
-	return c.size, c.cap, c.hit, c.miss
+	return c.size, c.numEntries, c.hit, c.miss
 }
 
 // ResetStats resets the statistics of the cache.
@@ -298,22 +298,22 @@ func (c *Cache) Empty() bool {
 
 // UnlockedEmpty is true if the cache is the concurrency-unsafe version of Empty.
 func (c *Cache) UnlockedEmpty() bool {
-	return c.cap == 0
+	return c.numEntries == 0
 }
 
-// Cap returns the current capacity of the cache.
-func (c *Cache) Cap() int64 {
+// numEntries returns the number of entries in the cache.
+func (c *Cache) NumEntries() int64 {
 	c.l.Lock()
 	defer c.l.Unlock()
-	return c.UnlockedCap()
+	return c.UnlockedNumEntries()
 }
 
-// UnlockedCap is the concurrency-unsafe version of Cap.
-func (c *Cache) UnlockedCap() int64 {
-	return c.cap
+// UnlockedNumEntries the concurrency-unsafe version of NumEntries.
+func (c *Cache) UnlockedNumEntries() int64 {
+	return c.numEntries
 }
 
-// Size returns the size of the cache.
+// Size returns the size of the cache in bytes.
 func (c *Cache) Size() int64 {
 	c.l.Lock()
 	defer c.l.Unlock()
@@ -360,7 +360,7 @@ func (c *Cache) validate(path string, n int64) error {
 		}
 	}
 
-	if c.cap+1 > c.maxCap {
+	if c.numEntries+1 > c.maxEntries {
 		err := c.evictLast()
 		if err != nil {
 			return err
@@ -376,7 +376,7 @@ func (c *Cache) evictLast() error {
 		item := last.Value.(*Meta)
 		if e := os.Remove(item.Path); e == nil {
 			c.size -= item.Size
-			c.cap--
+			c.numEntries--
 			delete(c.m, item.Key)
 			c.list.Remove(last)
 			return nil
@@ -391,7 +391,7 @@ func (c *Cache) evictLast() error {
 // addMeta adds meta information to the cache.
 func (c *Cache) addMeta(key string, tag []byte, path string, length int64) {
 	c.size += length
-	c.cap++
+	c.numEntries++
 	if item, ok := c.m[key]; ok {
 		c.list.Remove(item)
 	}

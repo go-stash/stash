@@ -83,7 +83,7 @@ func TestClear(t *testing.T) {
 		err := s.Put(k, b)
 		catch(err)
 	}
-	cl := s.Cap()
+	cl := s.NumEntries()
 	if cl != int64(len(blobs)) {
 		t.Fatalf("Expected cap == %d, got %d", len(blobs), cl)
 	}
