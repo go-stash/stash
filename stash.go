@@ -242,17 +242,17 @@ func (c *Cache) UnlockedGetWithTag(key string) (io.ReadCloser, []byte, error) {
 }
 
 // Delete a key from the cache if the given lambda returns true, do nothing otherwise.
-func (c *Cache) DeleteIf(key string, testTag func(tag []byte) bool) error {
+func (c *Cache) DeleteIf(key string, testTag func(tag []byte) bool) (bool, error) {
 	c.l.Lock()
 	defer c.l.Unlock()
 	return c.UnlockedDeleteIf(key, testTag)
 }
 
 // UnlockedDeleteIf is the concurrency-unsafe version of DeleteIf.
-func (c *Cache) UnlockedDeleteIf(key string, removeTest func(tag []byte) bool) error {
+func (c *Cache) UnlockedDeleteIf(key string, removeTest func(tag []byte) bool) (bool, error) {
 	elem, ok := c.m[key]
 	if !ok {
-		return ErrNotFound
+		return false, ErrNotFound
 	}
 	if item := elem.Value.(*Meta); removeTest(item.Tag) {
 		c.size -= item.Size
@@ -260,8 +260,10 @@ func (c *Cache) UnlockedDeleteIf(key string, removeTest func(tag []byte) bool) e
 		os.Remove(item.Path)
 		delete(c.m, item.Key)
 		c.list.Remove(elem)
+		return true, nil
 	}
-	return nil
+
+	return false, nil
 }
 
 // Delete a key from the cache, return error in case of key not present.

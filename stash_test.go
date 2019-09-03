@@ -135,12 +135,12 @@ func TestDeleteIf(t *testing.T) {
 		t.Fatalf("Expected size == 2, got %d", sz)
 	}
 
-	err = s.DeleteIf("test1", func(tag []byte) bool {
+	_, err = s.DeleteIf("test1", func(tag []byte) bool {
 		return bytes.Equal(tag, []byte("tag1"))
 	})
 	catch(err)
 
-	err = s.DeleteIf("test2", func(tag []byte) bool {
+	_, err = s.DeleteIf("test2", func(tag []byte) bool {
 		return bytes.Equal(tag, []byte("tag1"))
 	})
 	catch(err)
