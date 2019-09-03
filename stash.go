@@ -98,11 +98,11 @@ func (c *Cache) UnlockedClear() error {
 func (c *Cache) SetTag(key string, tag []byte) error {
 	c.l.Lock()
 	defer c.l.Unlock()
-	return c.SetTagUnlocked(key, tag)
+	return c.UnlockedSetTag(key, tag)
 }
 
-// SetTagUnlocked is the concurrency-unsafe version of SetTag.
-func (c *Cache) SetTagUnlocked(key string, tag []byte) error {
+// UnlockedSetTag is the concurrency-unsafe version of SetTag.
+func (c *Cache) UnlockedSetTag(key string, tag []byte) error {
 	if item, ok := c.m[key]; ok {
 		meta := item.Value.(*Meta)
 		switch {
@@ -122,11 +122,11 @@ func (c *Cache) SetTagUnlocked(key string, tag []byte) error {
 func (c *Cache) GetTag(key string) ([]byte, error) {
 	c.l.Lock()
 	defer c.l.Unlock()
-	return c.GetTagUnlocked(key)
+	return c.UnlockedGetTag(key)
 }
 
-// GetTagUnlocked is the concurrency-unsafe version of GetTag.
-func (c *Cache) GetTagUnlocked(key string) ([]byte, error) {
+// UnlockedGetTag is the concurrency-unsafe version of GetTag.
+func (c *Cache) UnlockedGetTag(key string) ([]byte, error) {
 	if item, ok := c.m[key]; ok {
 		return item.Value.(*Meta).Tag, nil
 	}
