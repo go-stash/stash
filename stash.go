@@ -415,11 +415,16 @@ func (c *Cache) evictLast() error {
 
 // addMeta adds meta information to the cache.
 func (c *Cache) addMeta(key string, tag []byte, path string, length int64) {
-	c.size += length
-	c.numEntries++
+	oldlength := int64(0)
+
 	if item, ok := c.m[key]; ok {
+		oldlength = item.Value.(*Meta).Size
 		c.list.Remove(item)
+	} else {
+		c.numEntries++
 	}
+
+	c.size += (length - oldlength)
 
 	item := &Meta{
 		Key:  key,
