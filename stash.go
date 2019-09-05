@@ -37,7 +37,8 @@ type Cache struct {
 
 // New creates a Cache backed by dir on disk. The cache allows at most c files of total size sz.
 func New(dir string, sz, c int64) (*Cache, error) {
-	if !validDir(dir) {
+
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return nil, ErrBadDir
 	}
 	if sz <= 0 {
@@ -434,9 +435,4 @@ func (c *Cache) addMeta(key string, tag []byte, path string, length int64) {
 	}
 	listElement := c.list.PushFront(item)
 	c.m[key] = listElement
-}
-
-func validDir(dir string) bool {
-	// XXX(hjr265): We need to ensure the disk is either empty, or contains a valid cache storage.
-	return dir != ""
 }
