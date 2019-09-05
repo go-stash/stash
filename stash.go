@@ -58,7 +58,7 @@ func New(dir string, sz, c int64) (*Cache, error) {
 		m:          make(map[string]*list.Element),
 	}
 
-	if err := cache.UnlockedClear(); err != nil {
+	if err := cache.Clear(); err != nil {
 		return nil, err
 	}
 	return cache, nil
@@ -66,16 +66,14 @@ func New(dir string, sz, c int64) (*Cache, error) {
 
 // Clear resets the cache and erases the files from the cache directory.
 func (c *Cache) Clear() error {
+
 	c.l.Lock()
 	defer c.l.Unlock()
-	return c.UnlockedClear()
-}
 
-// UnlockedClear is the concurrency-unsafe version of Clear function.
-func (c *Cache) UnlockedClear() error {
 	c.size = 0
 	c.numEntries = 0
-	c.UnlockedResetStats()
+
+	c.unlockedResetStats()
 	c.list = list.New()
 	c.m = make(map[string]*list.Element)
 
@@ -97,13 +95,10 @@ func (c *Cache) UnlockedClear() error {
 
 // SetTag simple sets a binary Tag to the cached key element.
 func (c *Cache) SetTag(key string, tag []byte) error {
+
 	c.l.Lock()
 	defer c.l.Unlock()
-	return c.UnlockedSetTag(key, tag)
-}
 
-// UnlockedSetTag is the concurrency-unsafe version of SetTag.
-func (c *Cache) UnlockedSetTag(key string, tag []byte) error {
 	if item, ok := c.m[key]; ok {
 		meta := item.Value.(*Meta)
 		switch {
@@ -121,13 +116,10 @@ func (c *Cache) UnlockedSetTag(key string, tag []byte) error {
 
 // GetTag retrieves the tag associated with the key.
 func (c *Cache) GetTag(key string) ([]byte, error) {
+
 	c.l.Lock()
 	defer c.l.Unlock()
-	return c.UnlockedGetTag(key)
-}
 
-// UnlockedGetTag is the concurrency-unsafe version of GetTag.
-func (c *Cache) UnlockedGetTag(key string) ([]byte, error) {
 	if item, ok := c.m[key]; ok {
 		return item.Value.(*Meta).Tag, nil
 	}
@@ -144,32 +136,22 @@ func (c *Cache) PutWithTag(key string, tag, val []byte) error {
 	return c.PutReaderWithTag(key, tag, bytes.NewReader(val))
 }
 
-// UnlockedPutWithTag is the concurrency-unsafe version of PutWithTag.
-func (c *Cache) UnlockedPutWithTag(key string, tag, val []byte) error {
-	return c.UnlockedPutReaderWithTag(key, tag, bytes.NewReader(val))
-}
-
 // PutReader adds the contents of a reader as a blob to the cache against the given key.
 func (c *Cache) PutReader(key string, r io.Reader) error {
-	c.l.Lock()
-	defer c.l.Unlock()
-	return c.UnlockedPutReaderWithTag(key, nil, r)
+	return c.PutReaderWithTag(key, nil, r)
 }
 
 // PutReaderWithTag like PutReader, adds the contents of a reader as blog along with a tag annotation against the given key.
 func (c *Cache) PutReaderWithTag(key string, tag []byte, r io.Reader) error {
-	c.l.Lock()
-	defer c.l.Unlock()
-	return c.UnlockedPutReaderWithTag(key, tag, r)
-}
-
-// UnlockedPutReaderWithTag is the concurrency-unsafe version of PutReaderWithTag.
-func (c *Cache) UnlockedPutReaderWithTag(key string, tag []byte, r io.Reader) error {
 
 	path, n, err := writeFile(c.dir, key, r)
 	if err != nil {
 		return err
 	}
+
+	c.l.Lock()
+	defer c.l.Unlock()
+
 	if err := c.validate(path, n); err != nil {
 		return err
 	}
@@ -180,31 +162,18 @@ func (c *Cache) UnlockedPutReaderWithTag(key string, tag []byte, r io.Reader) er
 
 // PutReaderChunked adds the contents of a reader, validating size chunk.
 func (c *Cache) PutReaderChunked(key string, r io.Reader) error {
-	return c.LockablePutReaderChunkedWithTag(key, nil, r, &c.l)
+	return c.PutReaderChunkedWithTag(key, nil, r)
 }
 
 // PutReaderChunkedWithTag, like PutReaderChunked, adds the contents of a reader along with a tag annotation.
 func (c *Cache) PutReaderChunkedWithTag(key string, tag []byte, r io.Reader) error {
-	return c.LockablePutReaderChunkedWithTag(key, tag, r, &c.l)
-}
-
-// UnlockedPutReaderChunkedWithTag is the concurrency-unsafe version of PutReaderChunkedWithTag.
-func (c *Cache) UnlockedPutReaderChunkedWithTag(key string, tag []byte, r io.Reader) error {
-	return c.LockablePutReaderChunkedWithTag(key, tag, r, nil)
-}
-
-// LockablePutReaderChunkedWithTag, like PutReaderChunkedWithTag, only with an extra optional pointer to mutex to lock.
-// If nil is passed, this version is concurrency-unsafe.
-func (c *Cache) LockablePutReaderChunkedWithTag(key string, tag []byte, r io.Reader, m *sync.Mutex) error {
 	path, n, err := writeFileValidate(c, c.dir, key, r)
 	if err != nil {
 		return errors.WithStack(os.Remove(path))
 	}
 
-	if m != nil {
-		m.Lock()
-		defer m.Unlock()
-	}
+	c.l.Lock()
+	defer c.l.Unlock()
 
 	c.addMeta(key, tag, path, n)
 	return nil
@@ -212,9 +181,7 @@ func (c *Cache) LockablePutReaderChunkedWithTag(key string, tag []byte, r io.Rea
 
 // Get returns a reader for a blob in the cache, or ErrNotFound otherwise.
 func (c *Cache) Get(key string) (io.ReadCloser, error) {
-	c.l.Lock()
-	defer c.l.Unlock()
-	r, _, e := c.UnlockedGetWithTag(key)
+	r, _, e := c.GetWithTag(key)
 	return r, e
 }
 
@@ -222,11 +189,6 @@ func (c *Cache) Get(key string) (io.ReadCloser, error) {
 func (c *Cache) GetWithTag(key string) (io.ReadCloser, []byte, error) {
 	c.l.Lock()
 	defer c.l.Unlock()
-	return c.UnlockedGetWithTag(key)
-}
-
-// UnlockedGetWithTag is the concurrency-unsafe version of GetWithTag.
-func (c *Cache) UnlockedGetWithTag(key string) (io.ReadCloser, []byte, error) {
 	if item, ok := c.m[key]; ok {
 		c.list.MoveToFront(item)
 		path := item.Value.(*Meta).Path
@@ -243,14 +205,9 @@ func (c *Cache) UnlockedGetWithTag(key string) (io.ReadCloser, []byte, error) {
 }
 
 // Delete a key from the cache if the given lambda returns true, do nothing otherwise.
-func (c *Cache) DeleteIf(key string, testTag func(tag []byte) bool) (bool, error) {
+func (c *Cache) DeleteIf(key string, removeTest func(tag []byte) bool) (bool, error) {
 	c.l.Lock()
 	defer c.l.Unlock()
-	return c.UnlockedDeleteIf(key, testTag)
-}
-
-// UnlockedDeleteIf is the concurrency-unsafe version of DeleteIf.
-func (c *Cache) UnlockedDeleteIf(key string, removeTest func(tag []byte) bool) (bool, error) {
 	elem, ok := c.m[key]
 	if !ok {
 		return false, ErrNotFound
@@ -271,11 +228,6 @@ func (c *Cache) UnlockedDeleteIf(key string, removeTest func(tag []byte) bool) (
 func (c *Cache) Delete(key string) error {
 	c.l.Lock()
 	defer c.l.Unlock()
-	return c.UnlockedDelete(key)
-}
-
-// UnlockedDelete is the concurrency-unsafe version of Delete.
-func (c *Cache) UnlockedDelete(key string) error {
 	elem, ok := c.m[key]
 	if !ok {
 		return ErrNotFound
@@ -294,11 +246,6 @@ func (c *Cache) UnlockedDelete(key string) error {
 func (c *Cache) Stats() (int64, int64, int64, int64) {
 	c.l.Lock()
 	defer c.l.Unlock()
-	return c.UnlockedStats()
-}
-
-// UnlockedStats is the concurrency-unsafe version of Stats.
-func (c *Cache) UnlockedStats() (int64, int64, int64, int64) {
 	return c.size, c.numEntries, c.hit, c.miss
 }
 
@@ -306,24 +253,13 @@ func (c *Cache) UnlockedStats() (int64, int64, int64, int64) {
 func (c *Cache) ResetStats() {
 	c.l.Lock()
 	defer c.l.Unlock()
-	c.UnlockedResetStats()
-}
-
-// UnlockedResetStats is the concurrency-unsafe version of ResetStats.
-func (c *Cache) UnlockedResetStats() {
-	c.hit = 0
-	c.miss = 0
+	c.unlockedResetStats()
 }
 
 // Empty returns true if the cache is empty.
 func (c *Cache) Empty() bool {
 	c.l.Lock()
 	defer c.l.Unlock()
-	return c.UnlockedEmpty()
-}
-
-// UnlockedEmpty is true if the cache is the concurrency-unsafe version of Empty.
-func (c *Cache) UnlockedEmpty() bool {
 	return c.numEntries == 0
 }
 
@@ -331,11 +267,6 @@ func (c *Cache) UnlockedEmpty() bool {
 func (c *Cache) NumEntries() int64 {
 	c.l.Lock()
 	defer c.l.Unlock()
-	return c.UnlockedNumEntries()
-}
-
-// UnlockedNumEntries the concurrency-unsafe version of NumEntries.
-func (c *Cache) UnlockedNumEntries() int64 {
 	return c.numEntries
 }
 
@@ -343,11 +274,6 @@ func (c *Cache) UnlockedNumEntries() int64 {
 func (c *Cache) Size() int64 {
 	c.l.Lock()
 	defer c.l.Unlock()
-	return c.UnlockedSize()
-}
-
-// UnlockedSize is the concurrency-unsafe version of Size.
-func (c *Cache) UnlockedSize() int64 {
 	return c.size
 }
 
@@ -355,11 +281,6 @@ func (c *Cache) UnlockedSize() int64 {
 func (c *Cache) Keys() []string {
 	c.l.Lock()
 	defer c.l.Unlock()
-	return c.UnlockedKeys()
-}
-
-// UnlockedKeys is the concurrency-unsafe version of Keys.
-func (c *Cache) UnlockedKeys() []string {
 	keys := make([]string, len(c.m))
 	i := 0
 	for item := c.list.Back(); item != nil; item = item.Prev() {
@@ -372,10 +293,16 @@ func (c *Cache) UnlockedKeys() []string {
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// UnlockedResetStats is the concurrency-unsafe version of ResetStats.
+func (c *Cache) unlockedResetStats() {
+	c.hit = 0
+	c.miss = 0
+}
+
 // validate ensures the file satisfies the constraints of the cache.
 func (c *Cache) validate(path string, n int64) error {
 	if n > c.maxSize {
-		os.Remove(path) // XXX(hjr265): We should not suppress this error even if it is very unlikely.
+		os.Remove(path)
 		return &FileError{c.dir, "", ErrTooLarge}
 	}
 
