@@ -97,6 +97,6 @@ func shasum(v string) string {
 }
 
 func realFilePath(dir, key string) string {
-	name := shasum(key)
+	name := shasum(key) + ".cache"
 	return path.Join(dir, name)
 }

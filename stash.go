@@ -86,7 +86,9 @@ func (c *Cache) Clear() error {
 	names, err := d.Readdirnames(-1)
 	if err == nil {
 		for _, name := range names {
-			os.RemoveAll(filepath.Join(c.dir, name))
+			if filepath.Ext(name) == ".cache" {
+				os.RemoveAll(filepath.Join(c.dir, name))
+			}
 		}
 	}
 
