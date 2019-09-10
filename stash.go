@@ -190,27 +190,27 @@ func (c *Cache) PutReaderChunkedWithTag(key string, tag []byte, r io.Reader) err
 }
 
 // Get returns a reader for a blob in the cache, or ErrNotFound otherwise.
-func (c *Cache) Get(key string) (io.ReadCloser, error) {
-	r, _, e := c.GetWithTag(key)
-	return r, e
+func (c *Cache) Get(key string) (io.ReadCloser, int64, error) {
+	r, _, s, e := c.GetWithTag(key)
+	return r, s, e
 }
 
 // GetWithTag returns a reader for a blob in the cache along with the associated tag, or ErrNotFound otherwise.
-func (c *Cache) GetWithTag(key string) (io.ReadCloser, []byte, error) {
+func (c *Cache) GetWithTag(key string) (io.ReadCloser, []byte, int64, error) {
 	c.l.Lock()
 	defer c.l.Unlock()
 	if item, ok := c.m[key]; ok {
 		c.list.MoveToFront(item)
 		path := item.Value.(*Meta).Path
 		if f, err := os.Open(path); err != nil {
-			return nil, nil, err
+			return nil, nil, 0, err
 		} else {
 			c.hit++
-			return f, item.Value.(*Meta).Tag, nil
+			return f, item.Value.(*Meta).Tag, item.Value.(*Meta).Size, nil
 		}
 	} else {
 		c.miss++
-		return nil, nil, ErrNotFound
+		return nil, nil, 0, ErrNotFound
 	}
 }
 

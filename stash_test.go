@@ -173,7 +173,7 @@ func TestCachePutAndGetWithTag(t *testing.T) {
 	}
 
 	for k, _ := range blobs {
-		_, tag, err := s.GetWithTag(k)
+		_, tag, _, err := s.GetWithTag(k)
 		catch(err)
 		if !bytes.Equal([]byte(k), tag) {
 			t.Fatalf("Expected tag == %q, got %q", k, tag)
@@ -210,27 +210,27 @@ func TestCacheDeleteAndStats(t *testing.T) { // cache
 		catch(err)
 	}
 
-	if _, err := s.Get("missing"); err == nil {
+	if _, _, err := s.Get("missing"); err == nil {
 		t.Fatalf("Miss Expected!")
 	}
-	_, c, h, m := s.Stats()
-	if c != int64(len(blobs)) {
-		t.Fatalf("Expected cap == %v, got %v", len(blobs), c)
+	stats := s.GetStats()
+	if stats.Entries != int64(len(blobs)) {
+		t.Fatalf("Expected entries == %v, got %v", len(blobs), stats.Entries)
 	}
 
-	if h != 0 {
-		t.Fatalf("Expected hit == 0, got %v", m)
+	if stats.Hit != 0 {
+		t.Fatalf("Expected hit == 0, got %v", stats.Hit)
 	}
 
 	s.Get("gopher")
 	s.Get("gopher")
 
-	if _, _, h, _ := s.Stats(); h != 2 {
-		t.Fatalf("Expected hit == 2, got %v", h)
+	if stats := s.GetStats(); stats.Hit != 2 {
+		t.Fatalf("Expected hit == 2, got %v", stats.Hit)
 	}
 
-	if m != 1 {
-		t.Fatalf("Expected miss == 1, got %v", m)
+	if stats.Miss != 1 {
+		t.Fatalf("Expected miss == 1, got %v", stats.Miss)
 	}
 
 	for k, _ := range blobs {
