@@ -12,6 +12,14 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Stats is the cache stats.
+type Stats struct {
+	Size    int64
+	Entries int64
+	Hit     int64
+	Miss    int64
+}
+
 // Meta is the information about the cache entry.
 type Meta struct {
 	Key  string
@@ -244,11 +252,16 @@ func (c *Cache) Delete(key string) error {
 	return nil
 }
 
-// Stats returns the Cache stats.
-func (c *Cache) Stats() (int64, int64, int64, int64) {
+// GetStats returns the Cache stats.
+func (c *Cache) GetStats() Stats {
 	c.l.Lock()
 	defer c.l.Unlock()
-	return c.size, c.numEntries, c.hit, c.miss
+	return Stats{
+		Size:    c.size,
+		Entries: c.numEntries,
+		Hit:     c.hit,
+		Miss:    c.miss,
+	}
 }
 
 // ResetStats resets the statistics of the cache.
