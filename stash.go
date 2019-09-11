@@ -12,6 +12,12 @@ import (
 	"github.com/pkg/errors"
 )
 
+type ReadSeekCloser interface {
+	io.Reader
+	io.Seeker
+	io.Closer
+}
+
 // Stats is the cache stats.
 type Stats struct {
 	Size    int64
@@ -190,13 +196,13 @@ func (c *Cache) PutReaderChunkedWithTag(key string, tag []byte, r io.Reader) err
 }
 
 // Get returns a reader for a blob in the cache, or ErrNotFound otherwise.
-func (c *Cache) Get(key string) (io.ReadCloser, int64, error) {
+func (c *Cache) Get(key string) (ReadSeekCloser, int64, error) {
 	r, _, s, e := c.GetWithTag(key)
 	return r, s, e
 }
 
 // GetWithTag returns a reader for a blob in the cache along with the associated tag, or ErrNotFound otherwise.
-func (c *Cache) GetWithTag(key string) (io.ReadCloser, []byte, int64, error) {
+func (c *Cache) GetWithTag(key string) (ReadSeekCloser, []byte, int64, error) {
 	c.l.Lock()
 	defer c.l.Unlock()
 	if item, ok := c.m[key]; ok {
