@@ -3,6 +3,7 @@ package stash
 import (
 	"bytes"
 	"container/list"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -76,6 +77,26 @@ func New(dir string, sz, c int64) (*Cache, error) {
 		return nil, err
 	}
 	return cache, nil
+}
+
+// Dump the content on the cache for debugging.
+func (c *Cache) Dump() {
+	c.l.Lock()
+	defer c.l.Unlock()
+	fmt.Printf("Stash: -------\n")
+	fmt.Printf("   dir        : %s\n", c.dir)
+	fmt.Printf("   max size   : %d\n", c.maxSize)
+	fmt.Printf("   max entries: %d\n", c.maxEntries)
+	fmt.Printf("   size       : %d\n", c.size)
+	fmt.Printf("   entries    : %d\n", c.numEntries)
+	fmt.Printf("   hit        : %d\n", c.hit)
+	fmt.Printf("   miss       : %d\n", c.miss)
+
+	for k, v := range c.m {
+		fmt.Printf("   key        : %s -> %+v\n", k, v.Value.(*Meta))
+	}
+
+	fmt.Printf("--------------\n")
 }
 
 // Clear resets the cache and erases the files from the cache directory.
