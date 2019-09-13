@@ -7,6 +7,8 @@ import (
 	"os"
 	"path"
 	"sync"
+
+	"github.com/gofrs/uuid"
 )
 
 type exoBuffer struct {
@@ -22,10 +24,18 @@ var s3FsPool = sync.Pool{
 }
 
 // writeFile writes a new file to the cache storage.
-func writeFile(dir, key string, r io.Reader) (string, int64, error) {
-	path := realFilePath(dir, key)
+func writeTmpFile(dir, key string, r io.Reader) (string, int64, error) {
+
+	ukey, err := uuid.NewV4()
+	if err != nil {
+		return "", 0, &FileError{dir, key, err}
+	}
+
+	path := path.Join(dir, ukey.String())
+
 	f, err := os.Create(path)
 	defer f.Close()
+
 	if err != nil {
 		return "", 0, &FileError{dir, key, err}
 	}

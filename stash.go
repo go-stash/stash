@@ -181,19 +181,36 @@ func (c *Cache) PutReader(key string, r io.Reader) error {
 // PutReaderWithTag like PutReader, adds the contents of a reader as blog along with a tag annotation against the given key.
 func (c *Cache) PutReaderWithTag(key string, tag []byte, r io.Reader) error {
 
-	path, n, err := writeFile(c.dir, key, r)
+	c.l.Lock()
+	if item, ok := c.m[key]; ok {
+		if bytes.Equal(tag, item.Value.(*Meta).Tag) {
+			fmt.Printf("File already present in cache!!!!!\n")
+			c.l.Unlock()
+			return nil
+		}
+	}
+	c.l.Unlock()
+
+	tmpPath, bytes, err := writeTmpFile(c.dir, key, r)
 	if err != nil {
 		return err
 	}
 
+	path := realFilePath(c.dir, key)
+
 	c.l.Lock()
 	defer c.l.Unlock()
 
-	if err := c.validate(path, n); err != nil {
+	if err := os.Rename(tmpPath, path); err != nil {
+		_ = os.Remove(tmpPath)
 		return err
 	}
 
-	c.addMeta(key, tag, path, n)
+	if err := c.validate(path, bytes); err != nil {
+		return err
+	}
+
+	c.addMeta(key, tag, path, bytes)
 	return nil
 }
 
