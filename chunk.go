@@ -40,7 +40,7 @@ func (c *ChunkCache) GetTag(key string, offset int64) ([]byte, error) {
 		return nil, ErrNotFound
 	}
 
-	tag, err := c.Cache.GetTag(mkey(key, offset))
+	tag, err := c.Cache.GetTag(chunkKey(key, offset))
 	if err != nil {
 		delete(elem.Offset, offset)
 		if len(elem.Offset) == 0 {
@@ -82,7 +82,7 @@ func (c *ChunkCache) unlockedSetTag(key string, offset int64, tag []byte) error 
 		return ErrChunkNotFound
 	}
 
-	keyfile := mkey(key, offset)
+	keyfile := chunkKey(key, offset)
 
 	ptag, err = c.Cache.GetTag(keyfile)
 	if err != nil {
@@ -113,7 +113,7 @@ func (c *ChunkCache) unlockedSetTag(key string, offset int64, tag []byte) error 
 
 	for off, _ := range elem.Offset {
 		if off != offset {
-			res, err := c.Cache.DeleteIf(mkey(key, off), func(t []byte) bool {
+			res, err := c.Cache.DeleteIf(chunkKey(key, off), func(t []byte) bool {
 				return !bytes.Equal(t, tag)
 			})
 			if res && err == nil {
@@ -147,7 +147,7 @@ func (c *ChunkCache) SetUntaggedChunks(key string, tag []byte) (int, error) {
 
 	for offset, _ := range elem.Offset {
 
-		keyfile := mkey(key, offset)
+		keyfile := chunkKey(key, offset)
 		ptag, err = c.Cache.GetTag(keyfile)
 		if err != nil {
 			delete(elem.Offset, offset)
@@ -200,7 +200,7 @@ func (c *ChunkCache) PutWithTag(key string, offset int64, tag []byte, val []byte
 	file.wg.Add(1)
 	defer file.wg.Done()
 
-	err := c.Cache.PutWithTag(mkey(key, offset), tag, val)
+	err := c.Cache.PutWithTag(chunkKey(key, offset), tag, val)
 	if err != nil {
 		return err
 	}
@@ -226,7 +226,7 @@ func (c *ChunkCache) PutReaderWithTag(key string, offset int64, tag []byte, lz L
 	file.wg.Add(1)
 	defer file.wg.Done()
 
-	r, err := c.Cache.PutReaderWithTag(mkey(key, offset), tag, lz)
+	r, err := c.Cache.PutReaderWithTag(chunkKey(key, offset), tag, lz)
 	if err != nil {
 		return r, err
 	}
@@ -256,7 +256,7 @@ func (c *ChunkCache) Get(key string, offset int64) (ReadSeekCloser, int64, error
 }
 
 func (c *ChunkCache) GetWithTag(key string, offset int64) (ReadSeekCloser, []byte, int64, error) {
-	rd, tag, size, err := c.Cache.GetWithTag(mkey(key, offset))
+	rd, tag, size, err := c.Cache.GetWithTag(chunkKey(key, offset))
 	if err != nil {
 		c.L.Lock()
 		defer c.L.Unlock()
@@ -289,7 +289,7 @@ func (c *ChunkCache) DeleteChunk(key string, offset int64) error {
 
 func (c *ChunkCache) unlockedDeleteChunk(key string, offset int64) error {
 	if c.delChunkOffset(key, offset) {
-		return c.Cache.Delete(mkey(key, offset))
+		return c.Cache.Delete(chunkKey(key, offset))
 	}
 	return ErrChunkNotFound
 }
@@ -311,7 +311,7 @@ func (c *ChunkCache) Shrink() {
 	defer c.L.Unlock()
 	for key, elem := range c.Chunks {
 		for offset, _ := range elem.Offset {
-			_, err := c.Cache.GetTag(mkey(key, offset))
+			_, err := c.Cache.GetTag(chunkKey(key, offset))
 			if err != nil {
 				delete(elem.Offset, offset)
 			}
@@ -352,7 +352,7 @@ func (c *ChunkCache) Keys() []string {
 
 ////////////////////////////////////////////////////////////////
 
-func mkey(key string, offset int64) string {
+func chunkKey(key string, offset int64) string {
 	return fmt.Sprintf("%s#%d", key, offset)
 }
 
