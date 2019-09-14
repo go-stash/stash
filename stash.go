@@ -5,6 +5,7 @@ import (
 	"container/list"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -18,6 +19,18 @@ const (
 	ENTRY_READY
 	ENTRY_DELETED
 )
+
+type LazyReader func() (io.ReadCloser, error)
+
+func NewLazyReader(r io.ReadCloser) LazyReader {
+	return func() (io.ReadCloser, error) {
+		return r, nil
+	}
+}
+
+func NewLazyReaderFromBuffer(buf []byte) LazyReader {
+	return NewLazyReader(ioutil.NopCloser(bytes.NewReader(buf)))
+}
 
 type ReadSeekCloser interface {
 	io.Reader
@@ -177,21 +190,21 @@ func (c *Cache) GetTag(key string) ([]byte, error) {
 
 // Put adds a byte slice as a blob to the cache against the given key.
 func (c *Cache) Put(key string, val []byte) error {
-	return c.PutReader(key, bytes.NewReader(val))
+	return c.PutReader(key, NewLazyReaderFromBuffer(val))
 }
 
 // Put like Put, adds a byte slice as a blob along with a tag annotation.
 func (c *Cache) PutWithTag(key string, tag, val []byte) error {
-	return c.PutReaderWithTag(key, tag, bytes.NewReader(val))
+	return c.PutReaderWithTag(key, tag, NewLazyReaderFromBuffer(val))
 }
 
-// PutReader adds the contents of a reader as a blob to the cache against the given key.
-func (c *Cache) PutReader(key string, r io.Reader) error {
+// PutReader adds the contents of a lazy reader as a blob to the cache against the given key.
+func (c *Cache) PutReader(key string, r LazyReader) error {
 	return c.PutReaderWithTag(key, nil, r)
 }
 
 // PutReaderWithTag like PutReader, adds the contents of a reader as blog along with a tag annotation against the given key.
-func (c *Cache) PutReaderWithTag(key string, tag []byte, r io.Reader) error {
+func (c *Cache) PutReaderWithTag(key string, tag []byte, lr LazyReader) error {
 
 	path := realFilePath(c.dir, key)
 
@@ -212,9 +225,18 @@ func (c *Cache) PutReaderWithTag(key string, tag []byte, r io.Reader) error {
 
 	item := c.addElement(key, tag, path, 0, ENTRY_BUSY)
 
+	reader, err := lr()
+	if err != nil {
+		c.l.Lock()
+		defer c.l.Unlock()
+		_, _ = c.removeElement(item)
+		c.c.Broadcast()
+		return err
+	}
+
 	c.l.Unlock()
 
-	tmpPath, bytes, err := writeTmpFile(c.dir, key, r)
+	tmpPath, bytes, err := writeTmpFile(c.dir, key, reader)
 
 	c.l.Lock()
 	defer c.l.Unlock()
