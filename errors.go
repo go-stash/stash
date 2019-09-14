@@ -10,6 +10,8 @@ var (
 	ErrTooLarge      = errors.New("file size must be less or equal storage size")
 	ErrUntagged      = errors.New("file is not tagged")
 	ErrAlreadyTagged = errors.New("file is already tagged")
+	ErrChunkNotFound = errors.New("chunk not found")
+	ErrIncoherentTag = errors.New("incoherent tag")
 )
 
 // FileError records the storage directory name and key of the that failed to cached.

@@ -67,7 +67,7 @@ func TestNew(t *testing.T) {
 	} {
 		clearStorage()
 
-		_, err := New(c.dir, c.sz, c.c)
+		_, err := NewCache(c.dir, c.sz, c.c)
 		if err != c.err {
 			t.Fatalf("#%d: Expected err == %q, got %q", i+1, c.err, err)
 		}
@@ -76,7 +76,7 @@ func TestNew(t *testing.T) {
 
 func TestClear(t *testing.T) {
 	clearStorage()
-	s, err := New(storageDir, 2048000, 40)
+	s, err := NewCache(storageDir, 2048000, 40)
 	catch(err)
 	for k, b := range blobs {
 		err := s.Put(k, b)
@@ -103,7 +103,7 @@ func TestClear(t *testing.T) {
 func TestCachePut(t *testing.T) {
 	clearStorage()
 
-	s, err := New(storageDir, 2048000, 40)
+	s, err := NewCache(storageDir, 2048000, 40)
 	catch(err)
 	for k, b := range blobs {
 		err := s.Put(k, b)
@@ -123,7 +123,7 @@ func TestCachePut(t *testing.T) {
 func TestDeleteIf(t *testing.T) {
 	clearStorage()
 
-	s, err := New(storageDir, 2048000, 40)
+	s, err := NewCache(storageDir, 2048000, 40)
 	catch(err)
 	err = s.PutWithTag("test1", []byte("tag1"), []byte("content"))
 	catch(err)
@@ -152,7 +152,7 @@ func TestDeleteIf(t *testing.T) {
 func TestAlreadyTagged(t *testing.T) {
 	clearStorage()
 
-	s, err := New(storageDir, 2048000, 40)
+	s, err := NewCache(storageDir, 2048000, 40)
 	catch(err)
 	err = s.PutWithTag("test", []byte("test"), []byte("content"))
 	catch(err)
@@ -165,7 +165,7 @@ func TestAlreadyTagged(t *testing.T) {
 func TestCachePutAndGetWithTag(t *testing.T) {
 	clearStorage()
 
-	s, err := New(storageDir, 2048000, 40)
+	s, err := NewCache(storageDir, 2048000, 40)
 	catch(err)
 	for k, b := range blobs {
 		err := s.PutWithTag(k, []byte(k), b)
@@ -184,7 +184,7 @@ func TestCachePutAndGetWithTag(t *testing.T) {
 func TestCacheSetAndGetTag(t *testing.T) {
 	clearStorage()
 
-	s, err := New(storageDir, 2048000, 40)
+	s, err := NewCache(storageDir, 2048000, 40)
 	catch(err)
 	for k, b := range blobs {
 		err := s.Put(k, b)
@@ -203,7 +203,7 @@ func TestCacheSetAndGetTag(t *testing.T) {
 func TestCacheDeleteAndStats(t *testing.T) { // cache
 	clearStorage()
 
-	s, err := New(storageDir, 2048000, 40)
+	s, err := NewCache(storageDir, 2048000, 40)
 	catch(err)
 	for k, b := range blobs {
 		err := s.Put(k, b)
@@ -254,7 +254,7 @@ func TestCacheDeleteAndStats(t *testing.T) { // cache
 func TestSizeEviction(t *testing.T) {
 	clearStorage()
 
-	s, err := New(storageDir, 10, 40)
+	s, err := NewCache(storageDir, 10, 40)
 	catch(err)
 
 	err = s.Put("a", []byte("abcdefgh"))
@@ -283,7 +283,7 @@ func TestSizeEviction(t *testing.T) {
 func TestCapEviction(t *testing.T) {
 	clearStorage()
 
-	s, err := New(storageDir, 2048, 3)
+	s, err := NewCache(storageDir, 2048, 3)
 	catch(err)
 
 	err = s.Put("a", []byte("abcdefg"))
