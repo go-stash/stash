@@ -9,8 +9,14 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+)
 
-	"github.com/pkg/errors"
+type EntryStatus int64
+
+const (
+	ENTRY_BUSY EntryStatus = iota
+	ENTRY_READY
+	ENTRY_DELETED
 )
 
 type ReadSeekCloser interface {
@@ -29,10 +35,11 @@ type Stats struct {
 
 // Meta is the information about the cache entry.
 type Meta struct {
-	Key  string
-	Size int64
-	Path string
-	Tag  []byte // user annotation
+	Key    string
+	Size   int64
+	Path   string
+	Tag    []byte // user annotation
+	Status EntryStatus
 }
 
 type Cache struct {
@@ -47,7 +54,8 @@ type Cache struct {
 	list *list.List               // List of items in cache
 	m    map[string]*list.Element // Map of items in list
 
-	l sync.Mutex
+	l *sync.Mutex
+	c *sync.Cond
 }
 
 // New creates a Cache backed by dir on disk. The cache allows at most c files of total size sz.
@@ -65,12 +73,16 @@ func New(dir string, sz, c int64) (*Cache, error) {
 
 	dir = filepath.Clean(dir)
 
+	lock := sync.Mutex{}
+
 	cache := &Cache{
 		dir:        dir,
 		maxSize:    sz,
 		maxEntries: c,
 		list:       list.New(),
 		m:          make(map[string]*list.Element),
+		l:          &lock,
+		c:          sync.NewCond(&lock),
 	}
 
 	if err := cache.Clear(); err != nil {
@@ -137,12 +149,12 @@ func (c *Cache) SetTag(key string, tag []byte) error {
 	defer c.l.Unlock()
 
 	if item, ok := c.m[key]; ok {
-		meta := item.Value.(*Meta)
+		elem := item.Value.(*Meta)
 		switch {
-		case meta.Tag == nil:
-			item.Value.(*Meta).Tag = tag
+		case elem.Tag == nil:
+			elem.Tag = tag
 			return nil
-		case bytes.Equal(meta.Tag, tag):
+		case bytes.Equal(elem.Tag, tag):
 			return nil
 		}
 
@@ -181,56 +193,55 @@ func (c *Cache) PutReader(key string, r io.Reader) error {
 // PutReaderWithTag like PutReader, adds the contents of a reader as blog along with a tag annotation against the given key.
 func (c *Cache) PutReaderWithTag(key string, tag []byte, r io.Reader) error {
 
-	c.l.Lock()
-	if item, ok := c.m[key]; ok {
-		if bytes.Equal(tag, item.Value.(*Meta).Tag) {
-			fmt.Printf("File already present in cache!!!!!\n")
-			c.l.Unlock()
-			return nil
-		}
-	}
-	c.l.Unlock()
-
-	tmpPath, bytes, err := writeTmpFile(c.dir, key, r)
-	if err != nil {
-		return err
-	}
-
 	path := realFilePath(c.dir, key)
 
 	c.l.Lock()
-	defer c.l.Unlock()
 
-	if err := os.Rename(tmpPath, path); err != nil {
-		_ = os.Remove(tmpPath)
-		return err
+	if item, ok := c.m[key]; ok {
+		status := c.waitStatus(item)
+		if status == ENTRY_READY {
+			if bytes.Equal(tag, item.Value.(*Meta).Tag) {
+				c.l.Unlock()
+				return nil
+			}
+		}
 	}
 
-	if err := c.validate(path, bytes); err != nil {
-		return err
-	}
+	// replace or add a new element...
+	//
 
-	c.addMeta(key, tag, path, bytes)
-	return nil
-}
+	item := c.addElement(key, tag, path, 0, ENTRY_BUSY)
 
-// PutReaderChunked adds the contents of a reader, validating size chunk.
-func (c *Cache) PutReaderChunked(key string, r io.Reader) error {
-	return c.PutReaderChunkedWithTag(key, nil, r)
-}
+	c.l.Unlock()
 
-// PutReaderChunkedWithTag, like PutReaderChunked, adds the contents of a reader along with a tag annotation.
-func (c *Cache) PutReaderChunkedWithTag(key string, tag []byte, r io.Reader) error {
-	path, n, err := writeFileValidate(c, c.dir, key, r)
-	if err != nil {
-		return errors.WithStack(os.Remove(path))
-	}
+	tmpPath, bytes, err := writeTmpFile(c.dir, key, r)
 
 	c.l.Lock()
 	defer c.l.Unlock()
 
-	c.addMeta(key, tag, path, n)
+	if err != nil {
+		_ = os.Remove(tmpPath)
+		goto Err
+	}
+
+	if err := os.Rename(tmpPath, path); err != nil {
+		_ = os.Remove(tmpPath)
+		goto Err
+	}
+
+	if err := c.validate(path, bytes); err != nil {
+		_ = os.Remove(path)
+		goto Err
+	}
+
+	_, _ = c.updateElement(key, tag, path, bytes, ENTRY_READY)
+	c.c.Broadcast()
 	return nil
+
+Err:
+	_, _ = c.removeElement(item)
+	c.c.Broadcast()
+	return err
 }
 
 // Get returns a reader for a blob in the cache, or ErrNotFound otherwise.
@@ -243,19 +254,25 @@ func (c *Cache) Get(key string) (ReadSeekCloser, int64, error) {
 func (c *Cache) GetWithTag(key string) (ReadSeekCloser, []byte, int64, error) {
 	c.l.Lock()
 	defer c.l.Unlock()
+
 	if item, ok := c.m[key]; ok {
-		c.list.MoveToFront(item)
-		path := item.Value.(*Meta).Path
-		if f, err := os.Open(path); err != nil {
-			return nil, nil, 0, err
-		} else {
-			c.hit++
-			return f, item.Value.(*Meta).Tag, item.Value.(*Meta).Size, nil
+		status := c.waitStatus(item)
+
+		if status == ENTRY_READY {
+			c.list.MoveToFront(item)
+			elem := item.Value.(*Meta)
+
+			if f, err := os.Open(elem.Path); err != nil {
+				return nil, nil, 0, err
+			} else {
+				c.hit++
+				return f, elem.Tag, elem.Size, nil
+			}
 		}
-	} else {
-		c.miss++
-		return nil, nil, 0, ErrNotFound
 	}
+
+	c.miss++
+	return nil, nil, 0, ErrNotFound
 }
 
 // Delete a key from the cache if the given lambda returns true, do nothing otherwise.
@@ -372,7 +389,7 @@ func (c *Cache) validate(path string, n int64) error {
 		}
 	}
 
-	if c.numEntries+1 > c.maxEntries {
+	if c.numEntries > c.maxEntries {
 		err := c.evictLast()
 		if err != nil {
 			return err
@@ -400,25 +417,88 @@ func (c *Cache) evictLast() error {
 	return nil
 }
 
-// addMeta adds meta information to the cache.
-func (c *Cache) addMeta(key string, tag []byte, path string, length int64) {
-	oldlength := int64(0)
+// addElement adds meta information to the cache.
+func (c *Cache) addElement(key string, tag []byte, path string, length int64, s EntryStatus) *list.Element {
 
 	if item, ok := c.m[key]; ok {
-		oldlength = item.Value.(*Meta).Size
-		c.list.Remove(item)
+
+		elem := item.Value.(*Meta)
+
+		c.size += (length - elem.Size)
+
+		elem.Tag = tag
+		elem.Size = length
+		elem.Path = path
+		elem.Status = s
+
+		c.list.MoveToFront(item)
+		return item
+
 	} else {
 		c.numEntries++
+		c.size += length
+
+		item := &Meta{
+			Key:    key,
+			Tag:    tag,
+			Size:   length,
+			Path:   path,
+			Status: s,
+		}
+		listElement := c.list.PushFront(item)
+		c.m[key] = listElement
+
+		return listElement
+	}
+}
+
+// updateElement updates meta information of a file.
+func (c *Cache) updateElement(key string, tag []byte, path string, length int64, s EntryStatus) (*list.Element, error) {
+
+	if item, ok := c.m[key]; ok {
+
+		elem := item.Value.(*Meta)
+
+		c.size += (length - elem.Size)
+
+		elem.Key = key
+		elem.Tag = tag
+		elem.Size = length
+		elem.Path = path
+		elem.Status = s
+
+		return item, nil
 	}
 
-	c.size += (length - oldlength)
+	return nil, ErrNotFound
+}
 
-	item := &Meta{
-		Key:  key,
-		Tag:  tag,
-		Size: length,
-		Path: path,
+// removeElement removes an element from the stash.
+func (c *Cache) removeElement(item *list.Element) (*list.Element, error) {
+
+	elem := item.Value.(*Meta)
+
+	if _, ok := c.m[elem.Key]; ok {
+		c.size -= elem.Size
+		c.numEntries--
+		delete(c.m, elem.Key)
+		c.list.Remove(item)
+
+		elem.Status = ENTRY_DELETED
+		return item, nil
 	}
-	listElement := c.list.PushFront(item)
-	c.m[key] = listElement
+
+	return nil, ErrNotFound
+}
+
+// waitStatus waits for the status to become READY or DELETED
+func (c *Cache) waitStatus(item *list.Element) EntryStatus {
+
+	elem := item.Value.(*Meta)
+
+	for elem.Status == ENTRY_BUSY {
+		c.c.Wait()
+	}
+
+	return elem.Status
 }
