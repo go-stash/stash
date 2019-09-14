@@ -190,21 +190,23 @@ func (c *Cache) GetTag(key string) ([]byte, error) {
 
 // Put adds a byte slice as a blob to the cache against the given key.
 func (c *Cache) Put(key string, val []byte) error {
-	return c.PutReader(key, NewLazyReaderFromBuffer(val))
+	_, err := c.PutReader(key, NewLazyReaderFromBuffer(val))
+	return err
 }
 
 // Put like Put, adds a byte slice as a blob along with a tag annotation.
 func (c *Cache) PutWithTag(key string, tag, val []byte) error {
-	return c.PutReaderWithTag(key, tag, NewLazyReaderFromBuffer(val))
+	_, err := c.PutReaderWithTag(key, tag, NewLazyReaderFromBuffer(val))
+	return err
 }
 
 // PutReader adds the contents of a lazy reader as a blob to the cache against the given key.
-func (c *Cache) PutReader(key string, r LazyReader) error {
+func (c *Cache) PutReader(key string, r LazyReader) (io.ReadCloser, error) {
 	return c.PutReaderWithTag(key, nil, r)
 }
 
 // PutReaderWithTag like PutReader, adds the contents of a reader as blog along with a tag annotation against the given key.
-func (c *Cache) PutReaderWithTag(key string, tag []byte, lr LazyReader) error {
+func (c *Cache) PutReaderWithTag(key string, tag []byte, lr LazyReader) (io.ReadCloser, error) {
 
 	path := realFilePath(c.dir, key)
 
@@ -215,7 +217,7 @@ func (c *Cache) PutReaderWithTag(key string, tag []byte, lr LazyReader) error {
 		if status == EntryReady {
 			if bytes.Equal(tag, item.Value.(*Meta).Tag) {
 				c.l.Unlock()
-				return nil
+				return nil, nil
 			}
 		}
 	}
@@ -231,7 +233,7 @@ func (c *Cache) PutReaderWithTag(key string, tag []byte, lr LazyReader) error {
 		defer c.l.Unlock()
 		_, _ = c.removeElement(item)
 		c.c.Broadcast()
-		return err
+		return reader, err
 	}
 
 	c.l.Unlock()
@@ -258,12 +260,12 @@ func (c *Cache) PutReaderWithTag(key string, tag []byte, lr LazyReader) error {
 
 	_, _ = c.updateElement(key, tag, path, bytes, EntryReady)
 	c.c.Broadcast()
-	return nil
+	return reader, nil
 
 Err:
 	_, _ = c.removeElement(item)
 	c.c.Broadcast()
-	return err
+	return reader, err
 }
 
 // Get returns a reader for a blob in the cache, or ErrNotFound otherwise.
