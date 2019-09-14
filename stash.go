@@ -281,7 +281,6 @@ func (c *Cache) GetWithTag(key string) (ReadSeekCloser, []byte, int64, error) {
 
 	if item, ok := c.m[key]; ok {
 		status := c.waitStatus(item)
-
 		if status == EntryReady {
 			c.list.MoveToFront(item)
 			elem := item.Value.(*Meta)
@@ -330,11 +329,11 @@ func (c *Cache) Delete(key string) error {
 
 	elem := item.Value.(*Meta)
 	c.size -= elem.Size
-	elem.Status = EntryDeleted
 	c.numEntries--
 	os.Remove(elem.Path)
 	delete(c.m, elem.Key)
 	c.list.Remove(item)
+	c.setStatus(elem, EntryDeleted)
 	return nil
 }
 
@@ -433,7 +432,7 @@ func (c *Cache) evictLast() error {
 			c.numEntries--
 			delete(c.m, elem.Key)
 			c.list.Remove(last)
-			elem.Status = EntryDeleted
+			c.setStatus(elem, EntryDeleted)
 			return nil
 		} else {
 			return e
@@ -504,7 +503,6 @@ func (c *Cache) removeElement(item *list.Element) (*list.Element, error) {
 		c.numEntries--
 		delete(c.m, elem.Key)
 		c.list.Remove(item)
-
 		elem.Status = EntryDeleted
 		return item, nil
 	}
@@ -522,4 +520,9 @@ func (c *Cache) waitStatus(item *list.Element) EntryStatus {
 	}
 
 	return elem.Status
+}
+
+func (c *Cache) setStatus(elem *Meta, s EntryStatus) {
+	elem.Status = s
+	c.c.Broadcast()
 }
