@@ -15,9 +15,9 @@ import (
 type EntryStatus int64
 
 const (
-	ENTRY_BUSY EntryStatus = iota
-	ENTRY_READY
-	ENTRY_DELETED
+	EntryBusy EntryStatus = iota
+	EntryReady
+	EntryDeleted
 )
 
 type LazyReader func() (io.ReadCloser, error)
@@ -212,7 +212,7 @@ func (c *Cache) PutReaderWithTag(key string, tag []byte, lr LazyReader) error {
 
 	if item, ok := c.m[key]; ok {
 		status := c.waitStatus(item)
-		if status == ENTRY_READY {
+		if status == EntryReady {
 			if bytes.Equal(tag, item.Value.(*Meta).Tag) {
 				c.l.Unlock()
 				return nil
@@ -223,7 +223,7 @@ func (c *Cache) PutReaderWithTag(key string, tag []byte, lr LazyReader) error {
 	// replace or add a new element...
 	//
 
-	item := c.addElement(key, tag, path, 0, ENTRY_BUSY)
+	item := c.addElement(key, tag, path, 0, EntryBusy)
 
 	reader, err := lr()
 	if err != nil {
@@ -256,7 +256,7 @@ func (c *Cache) PutReaderWithTag(key string, tag []byte, lr LazyReader) error {
 		goto Err
 	}
 
-	_, _ = c.updateElement(key, tag, path, bytes, ENTRY_READY)
+	_, _ = c.updateElement(key, tag, path, bytes, EntryReady)
 	c.c.Broadcast()
 	return nil
 
@@ -280,7 +280,7 @@ func (c *Cache) GetWithTag(key string) (ReadSeekCloser, []byte, int64, error) {
 	if item, ok := c.m[key]; ok {
 		status := c.waitStatus(item)
 
-		if status == ENTRY_READY {
+		if status == EntryReady {
 			c.list.MoveToFront(item)
 			elem := item.Value.(*Meta)
 
@@ -455,23 +455,22 @@ func (c *Cache) addElement(key string, tag []byte, path string, length int64, s 
 
 		c.list.MoveToFront(item)
 		return item
-
-	} else {
-		c.numEntries++
-		c.size += length
-
-		item := &Meta{
-			Key:    key,
-			Tag:    tag,
-			Size:   length,
-			Path:   path,
-			Status: s,
-		}
-		listElement := c.list.PushFront(item)
-		c.m[key] = listElement
-
-		return listElement
 	}
+
+	c.numEntries++
+	c.size += length
+
+	item := &Meta{
+		Key:    key,
+		Tag:    tag,
+		Size:   length,
+		Path:   path,
+		Status: s,
+	}
+	listElement := c.list.PushFront(item)
+	c.m[key] = listElement
+
+	return listElement
 }
 
 // updateElement updates meta information of a file.
@@ -506,7 +505,7 @@ func (c *Cache) removeElement(item *list.Element) (*list.Element, error) {
 		delete(c.m, elem.Key)
 		c.list.Remove(item)
 
-		elem.Status = ENTRY_DELETED
+		elem.Status = EntryDeleted
 		return item, nil
 	}
 
@@ -518,7 +517,7 @@ func (c *Cache) waitStatus(item *list.Element) EntryStatus {
 
 	elem := item.Value.(*Meta)
 
-	for elem.Status == ENTRY_BUSY {
+	for elem.Status == EntryBusy {
 		c.c.Wait()
 	}
 
