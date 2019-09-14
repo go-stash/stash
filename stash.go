@@ -323,17 +323,18 @@ func (c *Cache) DeleteIf(key string, removeTest func(tag []byte) bool) (bool, er
 func (c *Cache) Delete(key string) error {
 	c.l.Lock()
 	defer c.l.Unlock()
-	elem, ok := c.m[key]
+	item, ok := c.m[key]
 	if !ok {
 		return ErrNotFound
 	}
 
-	item := elem.Value.(*Meta)
-	c.size -= item.Size
+	elem := item.Value.(*Meta)
+	c.size -= elem.Size
+	elem.Status = EntryDeleted
 	c.numEntries--
-	os.Remove(item.Path)
-	delete(c.m, item.Key)
-	c.list.Remove(elem)
+	os.Remove(elem.Path)
+	delete(c.m, elem.Key)
+	c.list.Remove(item)
 	return nil
 }
 
@@ -426,12 +427,13 @@ func (c *Cache) validate(path string, n int64) error {
 // evitcLast removes the last file following the LRU policy.
 func (c *Cache) evictLast() error {
 	if last := c.list.Back(); last != nil {
-		item := last.Value.(*Meta)
-		if e := os.Remove(item.Path); e == nil {
-			c.size -= item.Size
+		elem := last.Value.(*Meta)
+		if e := os.Remove(elem.Path); e == nil {
+			c.size -= elem.Size
 			c.numEntries--
-			delete(c.m, item.Key)
+			delete(c.m, elem.Key)
 			c.list.Remove(last)
+			elem.Status = EntryDeleted
 			return nil
 		} else {
 			return e
@@ -445,11 +447,8 @@ func (c *Cache) evictLast() error {
 func (c *Cache) addElement(key string, tag []byte, path string, length int64, s EntryStatus) *list.Element {
 
 	if item, ok := c.m[key]; ok {
-
 		elem := item.Value.(*Meta)
-
 		c.size += (length - elem.Size)
-
 		elem.Tag = tag
 		elem.Size = length
 		elem.Path = path
@@ -479,7 +478,6 @@ func (c *Cache) addElement(key string, tag []byte, path string, length int64, s 
 func (c *Cache) updateElement(key string, tag []byte, path string, length int64, s EntryStatus) (*list.Element, error) {
 
 	if item, ok := c.m[key]; ok {
-
 		elem := item.Value.(*Meta)
 
 		c.size += (length - elem.Size)
