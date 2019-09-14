@@ -1,6 +1,6 @@
 # Stash
 
-Improved Go package for disk-based blob cache.
+Improved Go package for disk-based blob cache for files and chunks of files.
 
 ![](https://github.com/go-stash/stash/raw/master/folder.png)
 
