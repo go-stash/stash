@@ -1,5 +1,7 @@
 # Stash
 
+[![Go Reference](https://pkg.go.dev/badge/gopkg.in/stash.v1.svg)](https://pkg.go.dev/gopkg.in/stash.v1)
+
 A Go package for disk-based blob cache.
 
 ![](https://github.com/go-stash/stash/raw/master/folder.png)
